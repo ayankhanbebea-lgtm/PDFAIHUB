@@ -1,15 +1,23 @@
 // src/app/api/payments/razorpay/webhook/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { handleRazorpayWebhook } from '@/lib/razorpay';
+import { handleRazorpayWebhook, verifyRazorpayWebhookSignature } from '@/lib/razorpay';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
-  const payload = await request.json();
-  const signature = request.headers.get('x-razorpay-signature') || '';
-
   try {
-    await handleRazorpayWebhook(payload, signature);
+    const rawBody = await request.text();
+    const signature = request.headers.get('x-razorpay-signature') || '';
+
+    const isValid = verifyRazorpayWebhookSignature(rawBody, signature);
+    if (!isValid) {
+      console.warn('Invalid Razorpay Webhook signature received');
+      return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 400 });
+    }
+
+    const payload = JSON.parse(rawBody);
+    await handleRazorpayWebhook(payload);
+
     return NextResponse.json({ received: true });
   } catch (error: any) {
     console.error('Razorpay webhook error:', error);

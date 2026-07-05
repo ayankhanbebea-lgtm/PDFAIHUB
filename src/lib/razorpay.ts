@@ -16,117 +16,140 @@ export const razorpay = new Proxy({} as Razorpay, {
   }
 });
 
-export async function createRazorpaySubscription(
+// Price amounts in paise (1 INR = 100 paise)
+export const PLAN_PRICES = {
+  monthly: 14900, // ₹149
+  yearly: 118800, // ₹1188 (₹99 * 12)
+};
+
+export async function createRazorpayOrder(
   userId: string,
-  planId: string
-): Promise<{ subscriptionId: string; orderId: string }> {
+  planType: 'monthly' | 'yearly'
+): Promise<{ orderId: string; amount: number; currency: string }> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { email: true, name: true, razorpayCustomerId: true },
+    select: { email: true, name: true },
   });
 
   if (!user) throw new Error('User not found');
 
-  const subscription = await razorpay.subscriptions.create({
-    plan_id: planId,
-    customer_notify: 1,
-    total_count: 12,
+  const amount = PLAN_PRICES[planType];
+  const order = await razorpay.orders.create({
+    amount,
+    currency: 'INR',
+    receipt: `receipt_${userId}_${Date.now()}`,
     notes: {
       userId,
       userEmail: user.email,
+      planType,
     },
-  } as any);
+  });
 
   return {
-    subscriptionId: (subscription as any).id,
-    orderId: (subscription as any).id,
+    orderId: order.id,
+    amount: order.amount as number,
+    currency: order.currency as string,
   };
 }
 
-export function verifyRazorpayPayment(
-  subscriptionId: string,
+export function verifyRazorpayOrderSignature(
+  orderId: string,
   paymentId: string,
   signature: string
 ): boolean {
-  const text = `${paymentId}|${subscriptionId}`;
+  const text = `${orderId}|${paymentId}`;
   const expectedSignature = crypto
-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
+    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
     .update(text)
     .digest('hex');
 
   return expectedSignature === signature;
 }
 
-export async function handleRazorpayWebhook(
-  payload: Record<string, any>,
+export function verifyRazorpayWebhookSignature(
+  rawBody: string,
   signature: string
-): Promise<void> {
-  // Verify webhook signature
-  const body = JSON.stringify(payload);
+): boolean {
+  if (!process.env.RAZORPAY_WEBHOOK_SECRET) {
+    console.error('RAZORPAY_WEBHOOK_SECRET is not set');
+    return false;
+  }
   const expectedSignature = crypto
-    .createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET!)
-    .update(body)
+    .createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET)
+    .update(rawBody)
     .digest('hex');
 
-  if (expectedSignature !== signature) {
-    throw new Error('Invalid webhook signature');
-  }
+  return expectedSignature === signature;
+}
 
+export async function fulfillOrder(
+  userId: string,
+  planType: 'monthly' | 'yearly',
+  providerOrderId: string,
+  amount: number
+): Promise<void> {
+  const durationDays = planType === 'yearly' ? 365 : 30;
+  const currentPeriodStart = new Date();
+  const currentPeriodEnd = new Date();
+  currentPeriodEnd.setDate(currentPeriodEnd.getDate() + durationDays);
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: { plan: 'PRO' },
+    }),
+    prisma.subscription.upsert({
+      where: { providerSubId: providerOrderId },
+      create: {
+        userId,
+        plan: 'PRO',
+        status: 'ACTIVE',
+        provider: 'razorpay',
+        providerSubId: providerOrderId,
+        providerPlanId: planType,
+        currentPeriodStart,
+        currentPeriodEnd,
+        cancelAtPeriodEnd: true, // One-time charge does not auto-renew
+      },
+      update: {
+        status: 'ACTIVE',
+        currentPeriodEnd,
+      },
+    }),
+    // Also save transaction log
+    prisma.usageLog.create({
+      data: {
+        userId,
+        type: 'PAYMENT_SUCCESS',
+        metadata: {
+          orderId: providerOrderId,
+          planType,
+          amount,
+        },
+      },
+    }),
+  ]);
+}
+
+export async function handleRazorpayWebhook(
+  payload: Record<string, any>
+): Promise<void> {
   const event = payload.event;
 
-  switch (event) {
-    case 'subscription.activated':
-    case 'subscription.charged': {
-      const sub = payload.payload.subscription.entity;
-      const userId = sub.notes?.userId;
-      if (!userId) break;
+  // For orders api, handle order.paid or payment.captured
+  if (event === 'order.paid' || event === 'payment.captured') {
+    const orderEntity = event === 'order.paid' 
+      ? payload.payload.order.entity 
+      : payload.payload.payment.entity;
 
-      await prisma.$transaction([
-        prisma.user.update({
-          where: { id: userId },
-          data: { plan: 'PRO' },
-        }),
-        prisma.subscription.upsert({
-          where: { providerSubId: sub.id },
-          create: {
-            userId,
-            plan: 'PRO',
-            status: 'ACTIVE',
-            provider: 'razorpay',
-            providerSubId: sub.id,
-            providerPlanId: sub.plan_id,
-            currentPeriodStart: new Date(sub.current_start * 1000),
-            currentPeriodEnd: new Date(sub.current_end * 1000),
-          },
-          update: {
-            status: 'ACTIVE',
-            currentPeriodEnd: new Date(sub.current_end * 1000),
-          },
-        }),
-      ]);
-      break;
-    }
+    const orderNotes = orderEntity.notes || {};
+    const userId = orderNotes.userId;
+    const planType = orderNotes.planType as 'monthly' | 'yearly';
+    const orderId = event === 'order.paid' ? orderEntity.id : orderEntity.order_id;
+    const amount = orderEntity.amount;
 
-    case 'subscription.cancelled':
-    case 'subscription.completed':
-    case 'subscription.expired': {
-      const sub = payload.payload.subscription.entity;
-      const userId = sub.notes?.userId;
-      if (!userId) break;
-
-      await prisma.$transaction([
-        prisma.user.update({
-          where: { id: userId },
-          data: { plan: 'FREE' },
-        }),
-        prisma.subscription.updateMany({
-          where: { providerSubId: sub.id },
-          data: {
-            status: event === 'subscription.cancelled' ? 'CANCELLED' : 'EXPIRED',
-          },
-        }),
-      ]);
-      break;
+    if (userId && planType && orderId) {
+      await fulfillOrder(userId, planType, orderId, amount);
     }
   }
 }

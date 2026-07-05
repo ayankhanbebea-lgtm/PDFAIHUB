@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { createRazorpaySubscription } from '@/lib/razorpay';
+import { createRazorpayOrder } from '@/lib/razorpay';
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -11,11 +11,15 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { planId } = await request.json();
-    const result = await createRazorpaySubscription(session.user.id, planId);
+    const { planType } = await request.json();
+    if (planType !== 'monthly' && planType !== 'yearly') {
+      return NextResponse.json({ error: 'Invalid plan type' }, { status: 400 });
+    }
+
+    const result = await createRazorpayOrder(session.user.id, planType);
     return NextResponse.json(result);
   } catch (error: any) {
-    console.error('Razorpay error:', error);
+    console.error('Razorpay order creation error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

@@ -36,12 +36,8 @@ export function PricingSection() {
         });
         window.location.href = data.url;
       } else {
-        // Razorpay
-        const planId = planType === 'yearly'
-          ? process.env.NEXT_PUBLIC_RAZORPAY_PRO_YEARLY
-          : process.env.NEXT_PUBLIC_RAZORPAY_PRO_MONTHLY;
-
-        const { data } = await axios.post('/api/payments/razorpay/create', { planId });
+        // Razorpay (One-Time Order)
+        const { data } = await axios.post('/api/payments/razorpay/create', { planType });
 
         const rzpScript = document.createElement('script');
         rzpScript.src = 'https://checkout.razorpay.com/v1/checkout.js';
@@ -50,17 +46,39 @@ export function PricingSection() {
         rzpScript.onload = () => {
           const rzp = new (window as any).Razorpay({
             key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-            subscription_id: data.subscriptionId,
+            amount: data.amount,
+            currency: data.currency || 'INR',
+            order_id: data.orderId,
             name: 'PDFAI Hub',
             description: `Pro Plan - ${planType === 'yearly' ? 'Yearly' : 'Monthly'}`,
             prefill: {
-              email: session.user.email,
-              name: session.user.name,
+              email: session?.user?.email || '',
+              name: session?.user?.name || '',
             },
-            theme: { color: '#4f6bff' },
-            handler: function (response: any) {
-              toast.success('Payment successful! Your subscription is active.');
-              window.location.href = '/dashboard';
+            theme: { color: '#10B981' }, // Primary brand green
+            handler: async function (response: any) {
+              setLoadingPlan(planType);
+              try {
+                const verifyRes = await axios.post('/api/payments/razorpay/verify', {
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                  planType,
+                });
+
+                if (verifyRes.data.success) {
+                  toast.success('Payment verified successfully!');
+                  window.location.href = `/payment/success?orderId=${response.razorpay_order_id}`;
+                } else {
+                  window.location.href = '/payment/failed';
+                }
+              } catch (verifyErr: any) {
+                console.error('Payment verification failed:', verifyErr);
+                toast.error(verifyErr.response?.data?.error || 'Payment verification failed');
+                window.location.href = '/payment/failed';
+              } finally {
+                setLoadingPlan(null);
+              }
             },
             modal: {
               ondismiss: function () {
