@@ -1,5 +1,5 @@
 'use client';
-// src/app/ai/flashcards/page.tsx
+// src/app/ai/flashcards/page.tsx — Theme-aware
 import { useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -83,8 +83,8 @@ export default function FlashcardsPage() {
             {files.length > 0 && !loading && (
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-[#9CA3AF] mb-2 block">
-                    Number of flashcards: <span className="text-[#10B981] font-semibold">{count}</span>
+                  <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                    Number of flashcards: <span className="text-primary font-semibold">{count}</span>
                   </label>
                   <input
                     type="range"
@@ -93,13 +93,13 @@ export default function FlashcardsPage() {
                     step={5}
                     value={count}
                     onChange={(e) => setCount(Number(e.target.value))}
-                    className="w-full accent-[#10B981]"
+                    className="w-full accent-primary"
                   />
-                  <div className="flex justify-between text-xs text-[#6B7280] mt-1">
+                  <div className="flex justify-between text-xs text-muted-foreground/60 mt-1">
                     <span>5</span><span>50</span>
                   </div>
                 </div>
-                <button onClick={handleGenerate} className="btn-brand w-full py-3.5 flex items-center justify-center gap-2">
+                <button onClick={handleGenerate} className="btn-brand w-full py-3.5 flex items-center justify-center gap-2 cursor-pointer">
                   <Sparkles className="w-4 h-4" />
                   Generate {count} Flashcards
                 </button>
@@ -107,10 +107,10 @@ export default function FlashcardsPage() {
             )}
 
             {loading && (
-              <div className="bg-[#161B22] border border-[#1F2937] rounded-2xl p-10 text-center">
-                <div className="w-12 h-12 border-4 border-[#10B981] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                <p className="font-medium text-white">Generating flashcards...</p>
-                <p className="text-sm text-[#9CA3AF] mt-1">This may take 20-40 seconds</p>
+              <div className="bg-card border border-border rounded-2xl p-10 text-center transition-colors duration-300">
+                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                <p className="font-medium text-gray-900 dark:text-white">Generating flashcards...</p>
+                <p className="text-sm text-muted-foreground mt-1">This may take 20-40 seconds</p>
               </div>
             )}
           </>
@@ -118,20 +118,20 @@ export default function FlashcardsPage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
             {/* Stats */}
             <div className="flex items-center justify-between">
-              <p className="text-sm text-[#9CA3AF]">
+              <p className="text-sm text-muted-foreground">
                 Card {currentIndex + 1} of {flashcards.length}
               </p>
               <div className="flex gap-2">
                 <button
                   onClick={exportFlashcards}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-[#374151] text-[#9CA3AF] hover:text-white hover:bg-[#161B22] transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Export
                 </button>
                 <button
                   onClick={() => { setFlashcards([]); setFiles([]); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-[#374151] text-[#9CA3AF] hover:text-white hover:bg-[#161B22] transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   New
@@ -140,9 +140,9 @@ export default function FlashcardsPage() {
             </div>
 
             {/* Progress */}
-            <div className="h-1.5 bg-[#1F2937] rounded-full overflow-hidden">
+            <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
               <motion.div
-                className="h-full bg-[#10B981] rounded-full"
+                className="h-full bg-primary rounded-full"
                 animate={{ width: `${((currentIndex + 1) / flashcards.length) * 100}%` }}
                 transition={{ ease: 'easeOut' }}
               />
@@ -157,29 +157,25 @@ export default function FlashcardsPage() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
                 onClick={() => setFlipped(!flipped)}
-                className="cursor-pointer min-h-48 bg-[#161B22] border border-[#1F2937] rounded-2xl p-8 hover:border-[#10B981]/30 transition-colors flex flex-col items-center justify-center text-center gap-4"
+                className="cursor-pointer min-h-48 bg-card border border-border rounded-2xl p-8 hover:border-primary/30 transition-colors flex flex-col items-center justify-center text-center gap-4"
               >
-                <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
-                  flipped
-                    ? 'bg-[#10B981]/15 text-[#10B981]'
-                    : 'bg-[#10B981]/15 text-[#10B981]'
-                }`}>
+                <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-primary/10 text-primary">
                   {flipped ? 'Answer' : 'Question'}
                 </span>
-                <p className="text-lg text-white font-medium">
+                <p className="text-lg text-gray-900 dark:text-white font-medium">
                   {flipped ? current.back : current.front}
                 </p>
-                <p className="text-xs text-[#6B7280]">Click to {flipped ? 'see question' : 'reveal answer'}</p>
+                <p className="text-xs text-muted-foreground/60">Click to {flipped ? 'see question' : 'reveal answer'}</p>
               </motion.div>
             </AnimatePresence>
 
             {/* Navigation */}
             <div className="flex gap-4">
-              <button onClick={prev} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-[#374151] text-[#9CA3AF] hover:text-white hover:bg-[#161B22] transition-colors">
+              <button onClick={prev} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer">
                 <ChevronLeft className="w-4 h-4" />
                 Previous
               </button>
-              <button onClick={next} className="flex-1 btn-brand flex items-center justify-center gap-2 py-3">
+              <button onClick={next} className="flex-1 btn-brand flex items-center justify-center gap-2 py-3 cursor-pointer">
                 Next
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -187,16 +183,16 @@ export default function FlashcardsPage() {
 
             {/* All cards grid */}
             <div>
-              <p className="text-sm font-medium text-[#9CA3AF] mb-3">All Cards</p>
+              <p className="text-sm font-medium text-muted-foreground mb-3">All Cards</p>
               <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                 {flashcards.map((card, i) => (
                   <button
                     key={i}
                     onClick={() => { setCurrentIndex(i); setFlipped(false); }}
-                    className={`p-3 rounded-xl text-left text-xs border transition-colors ${
+                    className={`p-3 rounded-xl text-left text-xs border transition-colors cursor-pointer ${
                       i === currentIndex
-                        ? 'border-[#10B981] bg-[#10B981]/10 text-white'
-                        : 'border-[#1F2937] text-[#9CA3AF] hover:border-[#374151] hover:text-white'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:border-border/80 hover:text-foreground'
                     }`}
                   >
                     <p className="font-medium mb-0.5">#{i + 1}</p>

@@ -1,4 +1,4 @@
-// src/app/about/page.tsx
+// src/app/about/page.tsx — Theme-aware
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Navbar } from '@/components/layout/navbar';
@@ -51,20 +51,20 @@ const timelineSteps = [
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-[#FFFFFF]">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <Navbar />
 
       <main className="pt-24 pb-20">
         {/* Hero Section */}
-        <section className="relative overflow-hidden bg-hero-gradient py-20 border-b border-gray-200 dark:border-white/5">
+        <section className="relative overflow-hidden bg-hero-gradient py-20 border-b border-border transition-colors duration-300">
           {/* Subtle background glow */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[450px] h-[450px] bg-[#10B981]/5 rounded-full blur-[100px] pointer-events-none" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[450px] h-[450px] bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
 
           <div className="section-container relative z-10 text-center max-w-4xl mx-auto">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
               About PDFAI Hub
             </h1>
-            <p className="text-lg sm:text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
               PDFAI Hub is an all-in-one AI-powered PDF platform designed to simplify document management for students, professionals, freelancers, teachers, and businesses.
             </p>
           </div>
@@ -75,11 +75,11 @@ export default function AboutPage() {
           <div className="section-container">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center max-w-5xl mx-auto">
               <div className="space-y-6">
-                <h2 className="text-3xl font-bold text-white">Our Mission</h2>
-                <p className="text-gray-400 leading-relaxed text-base">
+                <h2 className="text-3xl font-bold text-foreground">Our Mission</h2>
+                <p className="text-muted-foreground leading-relaxed text-base">
                   Our mission is to make PDF editing and AI productivity accessible, affordable, and incredibly easy for everyone. We believe nobody should have to pay expensive monthly subscriptions just to merge two files or extract summaries from their lecture notes.
                 </p>
-                <p className="text-gray-400 leading-relaxed text-base">
+                <p className="text-muted-foreground leading-relaxed text-base">
                   By pairing traditional document utilities with state-of-the-art AI technology, we help you parse, study, compress, and secure your files in a single, fast, unified web experience.
                 </p>
                 <div className="pt-4">
@@ -91,10 +91,10 @@ export default function AboutPage() {
               </div>
 
               {/* Mission Visual Card */}
-              <div className="bg-[#161B22] border border-[#1F2937] p-8 rounded-2xl relative overflow-hidden group hover:border-[#10B981]/20 transition-colors">
-                <div className="absolute -top-12 -right-12 w-40 h-40 bg-[#10B981]/10 rounded-full blur-[40px]" />
-                <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                  <CheckCircle2 className="text-[#10B981] w-5 h-5" /> Why Choose Us?
+              <div className="bg-card border border-border p-8 rounded-2xl relative overflow-hidden group hover:border-primary/20 transition-colors">
+                <div className="absolute -top-12 -right-12 w-40 h-40 bg-primary/10 rounded-full blur-[40px]" />
+                <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
+                  <CheckCircle2 className="text-primary w-5 h-5" /> Why Choose Us?
                 </h3>
                 <ul className="space-y-4">
                   {[
@@ -104,8 +104,8 @@ export default function AboutPage() {
                     'Affordable, user-centric billing starting under $2/mo',
                     'Clean interface designed for maximum speed',
                   ].map((bullet, idx) => (
-                    <li key={idx} className="flex items-start gap-3 text-sm text-gray-300">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] mt-2 flex-shrink-0" />
+                    <li key={idx} className="flex items-start gap-3 text-sm text-muted-foreground">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
                       <span>{bullet}</span>
                     </li>
                   ))}
@@ -116,11 +116,11 @@ export default function AboutPage() {
         </section>
 
         {/* Features Showcase Grid */}
-        <section className="py-20 bg-gray-50/5 dark:bg-surface-dark-2 border-y border-[#1F2937]/50">
+        <section className="py-20 bg-secondary/30 border-y border-border">
           <div className="section-container">
             <div className="text-center mb-16 max-w-3xl mx-auto">
-              <h2 className="text-3xl font-bold text-white mb-4">Core Platform Capabilities</h2>
-              <p className="text-gray-400">
+              <h2 className="text-3xl font-bold text-foreground mb-4">Core Platform Capabilities</h2>
+              <p className="text-muted-foreground">
                 Explore the powerful tools engineered to simplify document management and turbocharge your studying or professional work.
               </p>
             </div>
@@ -131,13 +131,13 @@ export default function AboutPage() {
                 return (
                   <div
                     key={idx}
-                    className="p-6 bg-[#161B22] border border-[#1F2937] hover:border-[#10B981]/30 hover:shadow-card-hover rounded-2xl transition-all duration-300 group"
+                    className="p-6 bg-card border border-border hover:border-primary/30 hover:shadow-card-hover rounded-2xl transition-all duration-300 group"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <div className="w-10 h-10 rounded-xl bg-primary/15 text-primary border border-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                       <Icon className="w-5 h-5" />
                     </div>
-                    <h3 className="text-lg font-bold text-white mb-2">{feat.title}</h3>
-                    <p className="text-sm text-gray-400 leading-relaxed">{feat.desc}</p>
+                    <h3 className="text-lg font-bold text-foreground mb-2">{feat.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{feat.desc}</p>
                   </div>
                 );
               })}
@@ -149,26 +149,26 @@ export default function AboutPage() {
         <section className="py-20">
           <div className="section-container">
             <div className="text-center mb-16 max-w-3xl mx-auto">
-              <h2 className="text-3xl font-bold text-white mb-4">Our Journey & Values</h2>
-              <p className="text-gray-400">
+              <h2 className="text-3xl font-bold text-foreground mb-4">Our Journey & Values</h2>
+              <p className="text-muted-foreground">
                 How we built PDFAI Hub and what core values drive our decisions every single day.
               </p>
             </div>
 
-            <div className="relative max-w-3xl mx-auto border-l-2 border-[#1F2937] pl-6 md:pl-8 space-y-12">
+            <div className="relative max-w-3xl mx-auto border-l-2 border-border pl-6 md:pl-8 space-y-12">
               {timelineSteps.map((step, idx) => (
                 <div key={idx} className="relative">
                   {/* Timeline dot */}
-                  <div className="absolute -left-[31px] md:-left-[39px] top-1.5 w-4 h-4 rounded-full bg-[#0B0F19] border-2 border-[#10B981] shadow-[0_0_8px_#10B981]" />
+                  <div className="absolute -left-[31px] md:-left-[39px] top-1.5 w-4 h-4 rounded-full bg-background border-2 border-primary shadow-[0_0_8px_hsl(var(--primary))]" />
 
                   <div>
-                    <span className="text-xs font-bold uppercase tracking-wider text-[#10B981]">
+                    <span className="text-xs font-bold uppercase tracking-wider text-primary">
                       {step.phase}
                     </span>
-                    <h3 className="text-xl font-bold text-white mt-1 mb-2">
+                    <h3 className="text-xl font-bold text-foreground mt-1 mb-2">
                       {step.title}
                     </h3>
-                    <p className="text-sm text-gray-400 leading-relaxed">
+                    <p className="text-sm text-muted-foreground leading-relaxed">
                       {step.desc}
                     </p>
                   </div>

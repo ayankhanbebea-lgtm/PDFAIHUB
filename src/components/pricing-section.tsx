@@ -1,5 +1,5 @@
 'use client';
-// src/components/pricing-section.tsx
+// src/components/pricing-section.tsx — Theme-aware
 import { useState } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
@@ -58,35 +58,37 @@ export function PricingSection() {
               name: session.user.name,
             },
             theme: { color: '#4f6bff' },
-            handler: () => {
-              toast.success('Payment successful! Pro features unlocked.');
-              window.location.href = '/dashboard?payment=success';
+            handler: function (response: any) {
+              toast.success('Payment successful! Your subscription is active.');
+              window.location.href = '/dashboard';
             },
+            modal: {
+              ondismiss: function () {
+                setLoadingPlan(null);
+              }
+            }
           });
           rzp.open();
         };
       }
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Payment failed');
-    } finally {
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.error || 'Upgrade failed. Please contact support.');
       setLoadingPlan(null);
     }
   };
 
   const freeFeatures = [
-    { text: '50 PDF operations per rolling 24 hours', included: true },
-    { text: '10 AI requests per rolling 24 hours', included: true },
-    { text: 'PDF Merge, Split, Compress', included: true },
-    { text: 'Image to PDF', included: true },
-    { text: 'AI PDF Chat', included: false },
-    { text: 'Flashcard & Quiz Generator', included: false },
+    { text: '50 PDF operations daily', included: true },
+    { text: '10 AI Notes Summaries daily', included: true },
+    { text: 'All standard PDF Tools', included: true },
+    { text: 'Flashcard Generator', included: false },
+    { text: 'Interactive Quiz Generator', included: false },
     { text: 'Priority processing', included: false },
-    { text: 'Download history', included: false },
-    { text: 'No ads', included: false },
+    { text: 'Full download history', included: false },
   ];
 
   const proFeatures = [
-    { text: 'Unlimited AI requests', included: true },
     { text: 'Unlimited PDF operations', included: true },
     { text: 'All PDF Tools', included: true },
     { text: 'AI PDF Chat', included: true },
@@ -97,28 +99,28 @@ export function PricingSection() {
   ];
 
   return (
-    <section id="pricing" className="py-20 bg-gray-50 dark:bg-surface-dark-2">
+    <section id="pricing" className="py-20 bg-secondary/30 transition-colors duration-300">
       <div className="section-container">
         <div className="text-center mb-12">
-          <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+          <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
             Simple, Transparent Pricing
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 max-w-xl mx-auto mb-6">
+          <p className="text-muted-foreground max-w-xl mx-auto mb-6">
             Start free. Upgrade when you need more power.
           </p>
 
           {/* Payment provider selector */}
           <div className="flex items-center justify-center gap-2 mt-4">
-            <span className="text-xs text-gray-500">Pay via:</span>
+            <span className="text-xs text-muted-foreground">Pay via:</span>
             <button
               onClick={() => setProvider('razorpay')}
-              className={`px-3 py-1 text-xs rounded-lg border transition-colors ${provider === 'razorpay' ? 'border-brand-500 bg-brand-500/10 text-brand-500' : 'border-gray-300 dark:border-gray-700 text-gray-500'}`}
+              className={`px-3 py-1 text-xs rounded-lg border transition-colors ${provider === 'razorpay' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-foreground'}`}
             >
               Razorpay (India)
             </button>
             <button
               onClick={() => setProvider('stripe')}
-              className={`px-3 py-1 text-xs rounded-lg border transition-colors ${provider === 'stripe' ? 'border-brand-500 bg-brand-500/10 text-brand-500' : 'border-gray-300 dark:border-gray-700 text-gray-500'}`}
+              className={`px-3 py-1 text-xs rounded-lg border transition-colors ${provider === 'stripe' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-foreground'}`}
             >
               Stripe (Global)
             </button>
@@ -131,24 +133,24 @@ export function PricingSection() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="bg-[#161B22] border border-[#1F2937] rounded-3xl p-8 flex flex-col justify-between"
+            className="bg-card border border-border rounded-3xl p-8 flex flex-col justify-between transition-colors duration-300"
           >
             <div>
-              <h3 className="text-xl font-bold text-white mb-1">Free Plan</h3>
-              <p className="text-sm text-[#9CA3AF] mb-4">Great for casual users</p>
+              <h3 className="text-xl font-bold text-foreground mb-1">Free Plan</h3>
+              <p className="text-sm text-muted-foreground mb-4">Great for casual users</p>
               <div className="mb-6">
-                <span className="text-4xl font-bold text-white">₹0</span>
-                <span className="text-[#9CA3AF] ml-1">forever</span>
+                <span className="text-4xl font-bold text-foreground">₹0</span>
+                <span className="text-muted-foreground ml-1">forever</span>
               </div>
               <ul className="space-y-3 mb-8">
                 {freeFeatures.map((f) => (
                   <li key={f.text} className="flex items-center gap-3 text-sm">
                     {f.included ? (
-                      <Check className="w-4 h-4 text-[#10B981] flex-shrink-0" />
+                      <Check className="w-4 h-4 text-primary flex-shrink-0" />
                     ) : (
-                      <X className="w-4 h-4 text-[#6B7280] flex-shrink-0" />
+                      <X className="w-4 h-4 text-muted-foreground/50 flex-shrink-0" />
                     )}
-                    <span className={f.included ? 'text-[#9CA3AF]' : 'text-[#6B7280] line-through'}>
+                    <span className={f.included ? 'text-muted-foreground' : 'text-muted-foreground/40 line-through'}>
                       {f.text}
                     </span>
                   </li>
@@ -157,7 +159,7 @@ export function PricingSection() {
             </div>
             <Link
               href="/auth/register"
-              className="block w-full py-3 text-center rounded-xl border border-[#374151] hover:bg-[#111827] text-white font-medium transition-colors"
+              className="block w-full py-3 text-center rounded-xl border border-border hover:bg-secondary text-foreground font-medium transition-colors"
             >
               Get Started Free
             </Link>
@@ -169,22 +171,22 @@ export function PricingSection() {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
             viewport={{ once: true }}
-            className="bg-[#161B22] border border-[#10B981] rounded-3xl p-8 flex flex-col justify-between"
+            className="bg-card border border-primary rounded-3xl p-8 flex flex-col justify-between transition-colors duration-300"
           >
             <div>
-              <h3 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
-                Pro Monthly <Zap className="w-4 h-4 text-[#10B981]" />
+              <h3 className="text-xl font-bold text-foreground mb-1 flex items-center gap-2">
+                Pro Monthly <Zap className="w-4 h-4 text-primary" />
               </h3>
-              <p className="text-sm text-[#9CA3AF] mb-4">For power users & students</p>
+              <p className="text-sm text-muted-foreground mb-4">For power users & students</p>
               <div className="mb-6">
-                <span className="text-4xl font-bold text-white">₹149</span>
-                <span className="text-[#9CA3AF] ml-1">/month</span>
+                <span className="text-4xl font-bold text-foreground">₹149</span>
+                <span className="text-muted-foreground ml-1">/month</span>
               </div>
               <ul className="space-y-3 mb-8">
                 {proFeatures.map((f) => (
                   <li key={f.text} className="flex items-center gap-3 text-sm">
-                    <Check className="w-4 h-4 text-[#10B981] flex-shrink-0" />
-                    <span className="text-[#9CA3AF]">{f.text}</span>
+                    <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                    <span className="text-muted-foreground">{f.text}</span>
                   </li>
                 ))}
               </ul>
@@ -192,10 +194,10 @@ export function PricingSection() {
             <button
               onClick={() => handleUpgrade('monthly')}
               disabled={loadingPlan !== null}
-              className="w-full py-3 rounded-xl bg-[#10B981] hover:bg-[#059669] text-white font-bold transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold transition-colors disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer"
             >
               {loadingPlan === 'monthly' ? (
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
               ) : null}
               {session?.user?.plan === 'PRO' ? 'Upgrade Plan' : 'Buy Monthly'}
             </button>
@@ -207,28 +209,28 @@ export function PricingSection() {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
             viewport={{ once: true }}
-            className="relative bg-[#161B22] border-2 border-[#10B981] rounded-3xl p-8 flex flex-col justify-between"
+            className="relative bg-card border-2 border-primary rounded-3xl p-8 flex flex-col justify-between transition-colors duration-300"
           >
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <span className="bg-[#10B981] text-white text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
+              <span className="bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
                 BEST VALUE
               </span>
             </div>
             <div>
-              <h3 className="text-xl font-bold mb-1 flex items-center gap-2 text-white">
-                Pro Yearly <Zap className="w-4 h-4 text-[#10B981]" />
+              <h3 className="text-xl font-bold mb-1 flex items-center gap-2 text-foreground">
+                Pro Yearly <Zap className="w-4 h-4 text-primary" />
               </h3>
-              <p className="text-sm text-[#9CA3AF] mb-4">Ultimate value, maximum features</p>
+              <p className="text-sm text-muted-foreground mb-4">Ultimate value, maximum features</p>
               <div className="mb-6">
-                <span className="text-4xl font-bold text-white">₹99</span>
-                <span className="text-[#9CA3AF] ml-1">/month</span>
-                <p className="text-xs text-[#9CA3AF] mt-1">Billed annually at ₹1188/year</p>
+                <span className="text-4xl font-bold text-foreground">₹99</span>
+                <span className="text-muted-foreground ml-1">/month</span>
+                <p className="text-xs text-muted-foreground mt-1">Billed annually at ₹1188/year</p>
               </div>
               <ul className="space-y-3 mb-8">
                 {proFeatures.map((f) => (
                   <li key={f.text} className="flex items-center gap-3 text-sm">
-                    <Check className="w-4 h-4 text-[#10B981] flex-shrink-0" />
-                    <span className="text-[#9CA3AF]">{f.text}</span>
+                    <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                    <span className="text-muted-foreground">{f.text}</span>
                   </li>
                 ))}
               </ul>
@@ -236,10 +238,10 @@ export function PricingSection() {
             <button
               onClick={() => handleUpgrade('yearly')}
               disabled={loadingPlan !== null}
-              className="w-full py-3 rounded-xl bg-[#10B981] hover:bg-[#059669] text-white font-bold transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold transition-colors disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer"
             >
               {loadingPlan === 'yearly' ? (
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
               ) : null}
               {session?.user?.plan === 'PRO' ? 'Upgrade Plan' : 'Buy Yearly'}
             </button>

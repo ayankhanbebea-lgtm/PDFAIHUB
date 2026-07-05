@@ -1,5 +1,5 @@
 'use client';
-// src/app/ai/summarize/page.tsx
+// src/app/ai/summarize/page.tsx — Theme-aware
 import { useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -19,18 +19,18 @@ interface SectionProps {
 function Section({ title, icon, content, defaultOpen = false }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="bg-[#161B22] border border-[#1F2937] rounded-2xl overflow-hidden">
+    <div className="bg-card border border-border rounded-2xl overflow-hidden transition-colors duration-300">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between p-5 hover:bg-[#111827] transition-colors"
+        className="w-full flex items-center justify-between p-5 hover:bg-secondary transition-colors cursor-pointer"
       >
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#10B981]/15 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
             {icon}
           </div>
-          <span className="font-semibold text-white">{title}</span>
+          <span className="font-semibold text-gray-900 dark:text-white">{title}</span>
         </div>
-        {open ? <ChevronUp className="w-4 h-4 text-[#9CA3AF]" /> : <ChevronDown className="w-4 h-4 text-[#9CA3AF]" />}
+        {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
       </button>
       <AnimatePresence>
         {open && (
@@ -40,18 +40,18 @@ function Section({ title, icon, content, defaultOpen = false }: SectionProps) {
             exit={{ height: 0 }}
             className="overflow-hidden"
           >
-            <div className="px-5 pb-5 border-t border-[#1F2937]">
+            <div className="px-5 pb-5 border-t border-border">
               {Array.isArray(content) ? (
                 <ul className="mt-3 space-y-2">
                   {content.map((item, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-[#9CA3AF]">
-                      <span className="text-[#10B981] mt-0.5 flex-shrink-0">•</span>
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <span className="text-primary mt-0.5 flex-shrink-0">•</span>
                       {item}
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="mt-3 text-sm text-[#9CA3AF] leading-relaxed whitespace-pre-wrap">
+                <p className="mt-3 text-sm text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap">
                   {content}
                 </p>
               )}
@@ -107,7 +107,7 @@ export default function SummarizePage() {
       <div className="space-y-6">
         {/* Provider selector */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-[#9CA3AF]">AI Provider:</span>
+          <span className="text-sm text-muted-foreground">AI Provider:</span>
           {([
             { id: 'groq', label: '🤖 Groq AI' },
             { id: 'gemini', label: '✨ Gemini' }
@@ -115,10 +115,10 @@ export default function SummarizePage() {
             <button
               key={p.id}
               onClick={() => setProvider(p.id)}
-              className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+              className={`px-3 py-1.5 text-sm rounded-lg border transition-colors cursor-pointer ${
                 provider === p.id
-                  ? 'border-[#10B981] bg-[#10B981]/15 text-[#10B981]'
-                  : 'border-[#1F2937] text-[#9CA3AF]'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground'
               }`}
             >
               {p.label}
@@ -136,17 +136,17 @@ export default function SummarizePage() {
         />
 
         {files.length > 0 && !loading && !summary && (
-          <button onClick={handleSummarize} className="btn-brand w-full py-3.5 flex items-center justify-center gap-2">
+          <button onClick={handleSummarize} className="btn-brand w-full py-3.5 flex items-center justify-center gap-2 cursor-pointer">
             <Sparkles className="w-4 h-4" />
             Generate AI Summary
           </button>
         )}
 
         {loading && (
-          <div className="bg-[#161B22] border border-[#1F2937] rounded-2xl p-8 text-center">
-            <div className="w-12 h-12 border-4 border-[#10B981] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-white font-medium">Analyzing your notes...</p>
-            <p className="text-sm text-[#9CA3AF] mt-1">This may take 15-30 seconds</p>
+          <div className="bg-card border border-border rounded-2xl p-8 text-center transition-colors duration-300">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-900 dark:text-white font-medium">Analyzing your notes...</p>
+            <p className="text-sm text-muted-foreground mt-1">This may take 15-30 seconds</p>
           </div>
         )}
 
@@ -157,10 +157,10 @@ export default function SummarizePage() {
             className="space-y-3"
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-white">Summary Results</h2>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Summary Results</h2>
               <button
                 onClick={reset}
-                className="text-sm text-[#10B981] hover:text-[#059669] transition-colors"
+                className="text-sm text-primary hover:text-primary/80 transition-colors cursor-pointer"
               >
                 Summarize Another
               </button>
@@ -168,28 +168,28 @@ export default function SummarizePage() {
 
             <Section
               title="Quick Summary"
-              icon={<Brain className="w-4 h-4 text-[#10B981]" />}
+              icon={<Brain className="w-4 h-4 text-primary" />}
               content={summary.shortSummary}
               defaultOpen
             />
             <Section
               title="Detailed Summary"
-              icon={<FileText className="w-4 h-4 text-[#34D399]" />}
+              icon={<FileText className="w-4 h-4 text-primary" />}
               content={summary.detailedSummary}
             />
             <Section
               title="Key Points"
-              icon={<List className="w-4 h-4 text-[#10B981]" />}
+              icon={<List className="w-4 h-4 text-primary" />}
               content={summary.keyPoints}
             />
             <Section
               title="Exam Revision Notes"
-              icon={<BookOpen className="w-4 h-4 text-[#34D399]" />}
+              icon={<BookOpen className="w-4 h-4 text-primary" />}
               content={summary.examRevisionNotes}
             />
             <Section
               title="Important Questions"
-              icon={<HelpCircle className="w-4 h-4 text-[#10B981]" />}
+              icon={<HelpCircle className="w-4 h-4 text-primary" />}
               content={summary.importantQuestions}
             />
           </motion.div>

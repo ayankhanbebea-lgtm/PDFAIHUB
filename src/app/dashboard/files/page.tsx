@@ -1,5 +1,5 @@
 'use client';
-// src/app/dashboard/files/page.tsx
+// src/app/dashboard/files/page.tsx — Theme-aware
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import axios from 'axios';
@@ -71,33 +71,33 @@ export default function FilesPage() {
   if (!session) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-surface-dark">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <Navbar />
       <main className="pt-20">
         <div className="section-container py-8">
           <div className="flex items-center justify-between mb-8">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">File History</h1>
-            <span className="text-sm text-gray-500">{total} total files</span>
+            <span className="text-sm text-muted-foreground">{total} total files</span>
           </div>
 
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-3 mb-6">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search files..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#161B22] border border-[#1F2937] text-sm text-white focus:outline-none focus:border-[#10B981]"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-card border border-border text-foreground placeholder-muted-foreground/60 text-sm focus:outline-none focus:border-primary transition-colors duration-300"
               />
             </div>
             <div className="relative">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <select
                 value={toolFilter}
                 onChange={(e) => { setToolFilter(e.target.value); setPage(1); }}
-                className="pl-9 pr-8 py-2.5 rounded-xl bg-[#161B22] border border-[#1F2937] text-sm text-white focus:outline-none appearance-none"
+                className="pl-9 pr-8 py-2.5 rounded-xl bg-card border border-border text-foreground text-sm focus:outline-none appearance-none transition-colors duration-300 cursor-pointer"
               >
                 <option value="">All Tools</option>
                 {Object.entries(toolLabels).map(([id, label]) => (
@@ -113,10 +113,10 @@ export default function FilesPage() {
               {[...Array(5)].map((_, i) => <div key={i} className="h-20 skeleton rounded-xl" />)}
             </div>
           ) : filteredFiles.length === 0 ? (
-            <div className="bg-[#161B22] border border-[#1F2937] rounded-2xl p-16 text-center">
-              <FileText className="w-12 h-12 text-[#6B7280] mx-auto mb-4" />
-              <p className="text-lg font-medium text-white mb-2">No files found</p>
-              <p className="text-sm text-[#9CA3AF]">Your processed files will appear here</p>
+            <div className="bg-card border border-border rounded-2xl p-16 text-center transition-colors duration-300">
+              <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-lg font-medium text-gray-900 dark:text-white mb-2">No files found</p>
+              <p className="text-sm text-muted-foreground">Your processed files will appear here</p>
             </div>
           ) : (
             <>
@@ -124,25 +124,25 @@ export default function FilesPage() {
                 {filteredFiles.map((file) => (
                   <div
                     key={file.id}
-                    className="bg-[#161B22] border border-[#1F2937] rounded-xl p-4 flex items-center gap-4 hover:border-[#10B981]/20 transition-colors group"
+                    className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 hover:border-primary/20 transition-all duration-300 group"
                   >
-                    <div className="w-11 h-11 rounded-xl bg-[#1F2937] flex items-center justify-center text-xl flex-shrink-0">
+                    <div className="w-11 h-11 rounded-xl bg-secondary flex items-center justify-center text-xl flex-shrink-0">
                       {toolEmoji[file.tool] || '📄'}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{file.originalName}</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{file.originalName}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-[#9CA3AF]">{toolLabels[file.tool] || file.tool}</span>
-                        <span className="text-[#6B7280]">•</span>
-                        <span className="text-xs text-[#9CA3AF]">{formatBytes(file.size)}</span>
+                        <span className="text-xs text-muted-foreground">{toolLabels[file.tool] || file.tool}</span>
+                        <span className="text-muted-foreground">•</span>
+                        <span className="text-xs text-muted-foreground">{formatBytes(file.size)}</span>
                         {file.resultSize && file.resultSize !== file.size && (
                           <>
-                            <span className="text-[#6B7280]">→</span>
-                            <span className="text-xs text-[#10B981]">{formatBytes(file.resultSize)}</span>
+                            <span className="text-muted-foreground">→</span>
+                            <span className="text-xs text-primary">{formatBytes(file.resultSize)}</span>
                           </>
                         )}
-                        <span className="text-[#6B7280]">•</span>
-                        <span className="text-xs text-[#9CA3AF]">{formatRelativeTime(file.createdAt)}</span>
+                        <span className="text-muted-foreground">•</span>
+                        <span className="text-xs text-muted-foreground">{formatRelativeTime(file.createdAt)}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -152,7 +152,7 @@ export default function FilesPage() {
                           download
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-2 rounded-lg hover:bg-[#10B981]/10 text-gray-400 hover:text-[#10B981] transition-colors"
+                          className="p-2 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors cursor-pointer"
                           title="Download"
                         >
                           <Download className="w-4 h-4" />
@@ -161,7 +161,7 @@ export default function FilesPage() {
                       <button
                         onClick={() => deleteFile(file.id)}
                         disabled={deleting === file.id}
-                        className="p-2 rounded-lg hover:bg-red-950/20 text-gray-400 hover:text-red-500 transition-colors"
+                        className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
                         title="Delete"
                       >
                         {deleting === file.id ? (
@@ -171,7 +171,7 @@ export default function FilesPage() {
                         )}
                       </button>
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 bg-[#10B981]/10 text-[#10B981]`}>
+                    <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 bg-primary/10 text-primary`}>
                       {file.status}
                     </span>
                   </div>
@@ -184,15 +184,15 @@ export default function FilesPage() {
                   <button
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="px-4 py-2 rounded-xl border border-[#374151] text-sm disabled:opacity-40 hover:bg-[#161B22] text-white transition-colors"
+                    className="px-4 py-2 rounded-xl border border-border text-sm disabled:opacity-40 hover:bg-secondary text-gray-900 dark:text-white transition-colors duration-300 cursor-pointer"
                   >
                     Previous
                   </button>
-                  <span className="text-sm text-[#9CA3AF]">Page {page} of {totalPages}</span>
+                  <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
                   <button
                     onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
-                    className="px-4 py-2 rounded-xl border border-[#374151] text-sm disabled:opacity-40 hover:bg-[#161B22] text-white transition-colors"
+                    className="px-4 py-2 rounded-xl border border-border text-sm disabled:opacity-40 hover:bg-secondary text-gray-900 dark:text-white transition-colors duration-300 cursor-pointer"
                   >
                     Next
                   </button>

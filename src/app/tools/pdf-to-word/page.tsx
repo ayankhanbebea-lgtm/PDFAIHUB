@@ -1,5 +1,5 @@
 'use client';
-// src/app/tools/pdf-to-word/page.tsx
+// src/app/tools/pdf-to-word/page.tsx — Theme-aware
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { ToolLayout } from '@/components/tools/tool-layout';
@@ -61,7 +61,6 @@ export default function PDFToWordPage() {
 
   const reset = () => { setFiles([]); setStatus('idle'); setProgress(0); setDownloadUrl(''); setMessage(''); };
 
-
   return (
     <ToolLayout
       title="PDF to Word"
@@ -75,10 +74,10 @@ export default function PDFToWordPage() {
             Our converter preserves formatting, tables, and text as accurately as possible.
           </p>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">How it works</h3>
-          <ol className="space-y-2 text-gray-400">
+          <ol className="space-y-2 text-muted-foreground">
             {['Upload your PDF file', 'Click "Convert to Word"', 'Download the editable DOCX file'].map((step, i) => (
-              <li key={step} className="flex items-center gap-3 text-sm text-[#9CA3AF]">
-                <span className="w-6 h-6 rounded-full bg-[#10B981]/15 text-[#10B981] text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+              <li key={step} className="flex items-center gap-3 text-sm text-muted-foreground/80">
+                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
                 {step}
               </li>
             ))}
@@ -89,7 +88,7 @@ export default function PDFToWordPage() {
       <div className="space-y-6">
         <FileDropzone files={files} onFilesChange={setFiles} acceptedTypes={['application/pdf']} maxSizeMB={50} label="Drop PDF to convert to Word" />
         {files.length > 0 && status === 'idle' && (
-          <button onClick={handleConvert} className="btn-brand w-full py-3.5">Convert to Word (.docx)</button>
+          <button onClick={handleConvert} className="btn-brand w-full py-3.5 cursor-pointer">Convert to Word (.docx)</button>
         )}
         <UploadProgress
           progress={progress} status={status} message={message}

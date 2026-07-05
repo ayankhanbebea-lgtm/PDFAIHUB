@@ -11,12 +11,12 @@ export const metadata: Metadata = {
 
 export default function PricingPage() {
   return (
-    <div className="min-h-screen bg-white dark:bg-surface-dark">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <Navbar />
-      <main className="pt-20">
-        <div className="bg-gradient-to-b from-gray-50 to-white dark:from-surface-dark-2 dark:to-surface-dark py-16 text-center">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Simple, Transparent Pricing</h1>
-          <p className="text-gray-600 dark:text-gray-400 max-w-xl mx-auto">
+      <main className="pt-16">
+        <div className="bg-hero-gradient border-b border-border py-16 text-center transition-colors duration-300">
+          <h1 className="text-4xl font-bold text-foreground mb-4">Simple, Transparent Pricing</h1>
+          <p className="text-muted-foreground max-w-xl mx-auto">
             Start free. No credit card required. Upgrade anytime for unlimited access.
           </p>
         </div>

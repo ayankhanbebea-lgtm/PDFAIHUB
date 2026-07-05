@@ -1,5 +1,5 @@
 'use client';
-// src/app/tools/protect/page.tsx
+// src/app/tools/protect/page.tsx — Theme-aware
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Eye, EyeOff, Lock, Unlock } from 'lucide-react';
@@ -55,7 +55,6 @@ export default function ProtectPage() {
     }
   };
 
-
   const reset = () => {
     setFiles([]); setStatus('idle'); setProgress(0);
     setDownloadUrl(''); setMessage(''); setPassword('');
@@ -77,15 +76,15 @@ export default function ProtectPage() {
             <button
               key={id}
               onClick={() => setMode(id as any)}
-              className={`p-4 rounded-xl border-2 text-left transition-all ${
+              className={`p-4 rounded-xl border-2 text-left transition-all cursor-pointer ${
                 mode === id
-                  ? 'border-[#10B981] bg-[#10B981]/10 text-white'
-                  : 'border-[#1F2937] hover:border-[#374151]'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground hover:border-border/80 hover:text-foreground'
               }`}
             >
-              <Icon className={`w-5 h-5 mb-2 ${mode === id ? 'text-[#10B981]' : 'text-gray-400'}`} />
-              <p className="font-semibold text-sm text-white">{label}</p>
-              <p className="text-xs text-[#9CA3AF] mt-0.5">{desc}</p>
+              <Icon className={`w-5 h-5 mb-2 ${mode === id ? 'text-primary' : 'text-muted-foreground'}`} />
+              <p className="font-semibold text-sm text-gray-900 dark:text-white">{label}</p>
+              <p className="text-xs text-muted-foreground/80 mt-0.5">{desc}</p>
             </button>
           ))}
         </div>
@@ -100,7 +99,7 @@ export default function ProtectPage() {
 
         {files.length > 0 && status === 'idle' && mode === 'add' && (
           <div>
-            <label className="text-sm font-medium text-[#9CA3AF] block mb-1.5">
+            <label className="text-sm font-medium text-muted-foreground block mb-1.5">
               Set Password
             </label>
             <div className="relative">
@@ -109,24 +108,24 @@ export default function ProtectPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter a strong password"
-                className="w-full px-4 py-3 pr-12 rounded-xl bg-[#111827] border border-[#1F2937] text-white placeholder-gray-500 focus:outline-none focus:border-[#10B981] transition-colors"
+                className="w-full px-4 py-3 pr-12 rounded-xl bg-background border border-border text-foreground placeholder-muted-foreground/60 focus:outline-none focus:border-primary transition-colors"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-            <p className="text-xs text-[#6B7280] mt-1.5">
+            <p className="text-xs text-muted-foreground/60 mt-1.5">
               Use a strong password. You'll need it to open the PDF.
             </p>
           </div>
         )}
 
         {files.length > 0 && status === 'idle' && (
-          <button onClick={handleProtect} className="btn-brand w-full py-3.5 flex items-center justify-center gap-2">
+          <button onClick={handleProtect} className="btn-brand w-full py-3.5 flex items-center justify-center gap-2 cursor-pointer">
             {mode === 'add' ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
             {mode === 'add' ? 'Add Password Protection' : 'Remove Password'}
           </button>

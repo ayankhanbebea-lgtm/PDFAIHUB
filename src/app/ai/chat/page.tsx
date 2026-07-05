@@ -1,5 +1,5 @@
 'use client';
-// src/app/ai/chat/page.tsx
+// src/app/ai/chat/page.tsx — Theme-aware
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -99,7 +99,7 @@ export default function AIChat() {
             <button
               onClick={startSession}
               disabled={uploadingPDF}
-              className="btn-brand w-full py-3.5 flex items-center justify-center gap-2"
+              className="btn-brand w-full py-3.5 flex items-center justify-center gap-2 cursor-pointer"
             >
               {uploadingPDF ? (
                 <>
@@ -116,21 +116,21 @@ export default function AIChat() {
           )}
         </div>
       ) : (
-        <div className="flex flex-col h-[600px] bg-[#161B22] rounded-2xl border border-[#1F2937] overflow-hidden">
+        <div className="flex flex-col h-[600px] bg-card rounded-2xl border border-border overflow-hidden transition-colors duration-300">
           {/* Chat header */}
-          <div className="flex items-center justify-between p-4 border-b border-[#1F2937]">
+          <div className="flex items-center justify-between p-4 border-b border-border">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-[#10B981]/15 flex items-center justify-center">
-                <FileText className="w-4 h-4 text-[#10B981]" />
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <FileText className="w-4 h-4 text-primary" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-white truncate max-w-[250px]">{files[0]?.name}</p>
-                <p className="text-xs text-[#10B981] flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-[#10B981] rounded-full" /> AI Ready
+                <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[250px]">{files[0]?.name}</p>
+                <p className="text-xs text-primary flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-primary rounded-full" /> AI Ready
                 </p>
               </div>
             </div>
-            <button onClick={reset} className="p-2 rounded-lg hover:bg-white/5 text-[#9CA3AF] hover:text-white transition-colors">
+            <button onClick={reset} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
               <RefreshCw className="w-4 h-4" />
             </button>
           </div>
@@ -147,15 +147,15 @@ export default function AIChat() {
                 >
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                     msg.role === 'user'
-                      ? 'bg-[#10B981] text-white'
-                      : 'bg-[#1F2937]'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-muted-foreground'
                   }`}>
-                    {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4 text-[#10B981]" />}
+                    {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4 text-primary" />}
                   </div>
                   <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
                     msg.role === 'user'
-                      ? 'bg-[#10B981] text-white rounded-tr-sm'
-                      : 'bg-[#111827] border border-[#1F2937] text-white rounded-tl-sm'
+                      ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                      : 'bg-secondary/40 border border-border text-foreground rounded-tl-sm'
                   }`}>
                     {msg.role === 'assistant' ? (
                       <ReactMarkdown className="prose dark:prose-invert prose-sm max-w-none">
@@ -171,15 +171,15 @@ export default function AIChat() {
 
             {loading && (
               <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#1F2937] flex items-center justify-center">
-                  <Bot className="w-4 h-4 text-[#10B981]" />
+                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+                  <Bot className="w-4 h-4 text-primary" />
                 </div>
-                <div className="bg-[#111827] border border-[#1F2937] rounded-2xl rounded-tl-sm px-4 py-3">
+                <div className="bg-secondary/40 border border-border rounded-2xl rounded-tl-sm px-4 py-3">
                   <div className="flex gap-1">
                     {[0, 1, 2].map((i) => (
                       <span
                         key={i}
-                        className="w-2 h-2 bg-[#10B981] rounded-full animate-bounce"
+                        className="w-2 h-2 bg-primary rounded-full animate-bounce"
                         style={{ animationDelay: `${i * 0.15}s` }}
                       />
                     ))}
@@ -191,7 +191,7 @@ export default function AIChat() {
           </div>
 
           {/* Input */}
-          <div className="p-4 border-t border-[#1F2937]">
+          <div className="p-4 border-t border-border">
             <div className="flex gap-3">
               <input
                 type="text"
@@ -199,14 +199,14 @@ export default function AIChat() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                 placeholder="Ask anything about this document..."
-                className="flex-1 bg-[#111827] border border-[#1F2937] rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#10B981] transition-colors"
+                className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder-muted-foreground/60 focus:outline-none focus:border-primary transition-colors duration-300"
               />
               <button
                 onClick={sendMessage}
                 disabled={!input.trim() || loading}
-                className="w-11 h-11 rounded-xl bg-[#10B981] hover:bg-[#059669] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                className="w-11 h-11 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors cursor-pointer"
               >
-                <Send className="w-4 h-4 text-white" />
+                <Send className="w-4 h-4 text-primary-foreground" />
               </button>
             </div>
           </div>

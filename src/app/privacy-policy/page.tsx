@@ -1,4 +1,4 @@
-// src/app/privacy-policy/page.tsx
+// src/app/privacy-policy/page.tsx — Theme-aware
 import type { Metadata } from 'next';
 import { Navbar } from '@/components/layout/navbar';
 import { Footer } from '@/components/layout/footer';
@@ -59,20 +59,20 @@ export default function PrivacyPolicyPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-[#FFFFFF]">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <Navbar />
 
       <main className="pt-24 pb-20">
         {/* Header */}
-        <section className="relative overflow-hidden bg-hero-gradient py-12 border-b border-gray-200 dark:border-white/5">
+        <section className="relative overflow-hidden bg-hero-gradient py-12 border-b border-border transition-colors duration-300">
           <div className="section-container relative z-10 max-w-4xl mx-auto">
-            <span className="text-xs bg-[#10B981]/15 text-[#10B981] px-3.5 py-1.5 rounded-full font-semibold uppercase tracking-wider">
+            <span className="text-xs bg-primary/10 text-primary px-3.5 py-1.5 rounded-full font-semibold uppercase tracking-wider">
               Legal Center
             </span>
-            <h1 className="text-4xl font-bold mt-4 mb-2 text-white">
+            <h1 className="text-4xl font-bold mt-4 mb-2 text-foreground">
               Privacy Policy
             </h1>
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-muted-foreground">
               Last Updated: July 5, 2026
             </p>
           </div>
@@ -83,8 +83,8 @@ export default function PrivacyPolicyPage() {
           <div className="section-container max-w-4xl mx-auto">
             <div className="grid grid-cols-1 gap-8">
               {/* Introduction */}
-              <div className="bg-[#161B22] border border-[#1F2937] p-6 sm:p-8 rounded-2xl">
-                <p className="text-sm sm:text-base text-gray-300 leading-relaxed">
+              <div className="bg-card border border-border p-6 sm:p-8 rounded-2xl transition-colors duration-300">
+                <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
                   Welcome to PDFAI Hub (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). We respect your privacy and are committed to protecting the personal data you share with us. This Privacy Policy details how we collect, process, and protect your information when you access our tools and services.
                 </p>
               </div>
@@ -93,14 +93,14 @@ export default function PrivacyPolicyPage() {
               {sections.map((section, idx) => {
                 const Icon = section.icon;
                 return (
-                  <div key={idx} className="bg-[#161B22] border border-[#1F2937] p-6 sm:p-8 rounded-2xl space-y-4">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/25 flex items-center justify-center flex-shrink-0">
+                  <div key={idx} className="bg-card border border-border p-6 sm:p-8 rounded-2xl space-y-4 transition-colors duration-300">
+                    <h2 className="text-xl font-bold text-foreground flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary border border-primary/25 flex items-center justify-center flex-shrink-0">
                         <Icon className="w-4.5 h-4.5" />
                       </div>
                       {section.title}
                     </h2>
-                    <div className="text-sm text-gray-300 leading-relaxed space-y-2 whitespace-pre-line pl-12">
+                    <div className="text-sm text-muted-foreground leading-relaxed space-y-2 whitespace-pre-line pl-12">
                       {section.content}
                     </div>
                   </div>
@@ -108,13 +108,13 @@ export default function PrivacyPolicyPage() {
               })}
 
               {/* Cookies, Payments, User Rights */}
-              <div className="bg-[#161B22] border border-[#1F2937] p-6 sm:p-8 rounded-2xl space-y-4">
-                <h2 className="text-xl font-bold text-white pl-12">
+              <div className="bg-card border border-border p-6 sm:p-8 rounded-2xl space-y-4 transition-colors duration-300">
+                <h2 className="text-xl font-bold text-foreground pl-12">
                   Cookies, Payment Information & User Rights
                 </h2>
-                <div className="text-sm text-gray-300 leading-relaxed pl-12 space-y-4">
+                <div className="text-sm text-muted-foreground leading-relaxed pl-12 space-y-4">
                   <p>
-                    <strong>Cookies:</strong> We use standard security and functional cookies to remember authorization sessions and configuration settings. Read our full <a href="/cookies" className="text-[#10B981] hover:underline font-semibold">Cookie Policy</a> to learn how to manage them.
+                    <strong>Cookies:</strong> We use standard security and functional cookies to remember authorization sessions and configuration settings. Read our full <a href="/cookies" className="text-primary hover:underline font-semibold">Cookie Policy</a> to learn how to manage them.
                   </p>
                   <p>
                     <strong>Payment Information:</strong> Upgrading to a premium membership is routed through Stripe or Razorpay. PDFAI Hub does not receive, view, or log any credit card details or payment secrets.
@@ -126,14 +126,14 @@ export default function PrivacyPolicyPage() {
               </div>
 
               {/* Contact Email */}
-              <div className="bg-[#10B981]/5 border border-[#10B981]/20 p-6 sm:p-8 rounded-2xl text-center space-y-3">
-                <h3 className="text-lg font-bold text-white">Questions About Our Privacy Policy?</h3>
-                <p className="text-sm text-gray-400 max-w-lg mx-auto">
+              <div className="bg-primary/5 border border-primary/20 p-6 sm:p-8 rounded-2xl text-center space-y-3 transition-colors duration-300">
+                <h3 className="text-lg font-bold text-foreground">Questions About Our Privacy Policy?</h3>
+                <p className="text-sm text-muted-foreground max-w-lg mx-auto">
                   If you have queries, need data access, or wish to request complete deletion of your records, contact our privacy compliance officer.
                 </p>
                 <a
                   href="mailto:pdfaihub@gmail.com"
-                  className="inline-block text-base font-bold text-[#10B981] hover:underline"
+                  className="inline-block text-base font-bold text-primary hover:underline"
                 >
                   pdfaihub@gmail.com
                 </a>

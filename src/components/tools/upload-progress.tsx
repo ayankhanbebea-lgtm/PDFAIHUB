@@ -108,7 +108,7 @@ export function UploadProgress({
               {onReset && (
                 <button
                   onClick={onReset}
-                  className="px-4 py-3 rounded-xl border border-gray-300 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-sm"
+                  className="px-4 py-3 rounded-xl border border-border text-foreground hover:bg-secondary transition-colors text-sm cursor-pointer"
                 >
                   Process Another
                 </button>
@@ -120,7 +120,7 @@ export function UploadProgress({
         {status === 'error' && onReset && (
           <button
             onClick={onReset}
-            className="w-full py-2.5 rounded-xl border border-red-200 dark:border-red-800 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors text-sm"
+            className="w-full py-2.5 rounded-xl border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors text-sm cursor-pointer"
           >
             Try Again
           </button>

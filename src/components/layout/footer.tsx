@@ -1,5 +1,5 @@
 'use client';
-// src/components/layout/footer.tsx
+// src/components/layout/footer.tsx — Theme-aware
 import Link from 'next/link';
 import { FileText, Github, Linkedin } from 'lucide-react';
 
@@ -34,25 +34,25 @@ const footerLinks = {
 
 export function Footer() {
   return (
-    <footer className="bg-gray-50 dark:bg-surface-dark-2 border-t border-gray-200 dark:border-white/5">
+    <footer className="bg-card border-t border-border transition-colors duration-300">
       <div className="section-container py-16">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center gap-2 font-bold text-xl mb-4">
-              <div className="w-8 h-8 bg-[#10B981] rounded-lg flex items-center justify-center">
-                <FileText className="w-4 h-4 text-white" />
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <FileText className="w-4 h-4 text-primary-foreground" />
               </div>
               <span className="gradient-text">PDFAI Hub</span>
             </Link>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               The most powerful AI PDF toolkit for students and professionals.
             </p>
             <div className="flex gap-3">
-              <a href="https://github.com/ayankhanbebea-lgtm" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-lg glass border border-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors" title="GitHub">
+              <a href="https://github.com/ayankhanbebea-lgtm" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-lg glass border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors" title="GitHub">
                 <Github className="w-4 h-4" />
               </a>
-              <a href="https://www.linkedin.com/in/ayan-khan-8b630337a/?skipRedirect=true" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-lg glass border border-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors" title="LinkedIn">
+              <a href="https://www.linkedin.com/in/ayan-khan-8b630337a/?skipRedirect=true" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-lg glass border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors" title="LinkedIn">
                 <Linkedin className="w-4 h-4" />
               </a>
             </div>
@@ -61,11 +61,11 @@ export function Footer() {
           {/* Links */}
           {Object.entries(footerLinks).map(([category, links]) => (
             <div key={category}>
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">{category}</h3>
+              <h3 className="text-sm font-semibold text-foreground mb-4">{category}</h3>
               <ul className="space-y-2.5">
                 {links.map((link) => (
                   <li key={link.href}>
-                    <Link href={link.href} className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                    <Link href={link.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                       {link.name}
                     </Link>
                   </li>
@@ -75,12 +75,12 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-12 pt-8 border-t border-gray-200 dark:border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+        <div className="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} PDFAI Hub. All rights reserved.
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Created by <span className="font-semibold text-white">Ezio (Ayan)</span>
+          <p className="text-sm text-muted-foreground">
+            Created by <span className="font-semibold text-foreground">Ezio (Ayan)</span>
           </p>
         </div>
       </div>

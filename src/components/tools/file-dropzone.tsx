@@ -84,20 +84,20 @@ export function FileDropzone({
       >
         <input {...getInputProps()} />
         <div className="flex flex-col items-center gap-3">
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-colors ${isDragActive ? 'bg-brand-500/20' : 'bg-gray-100 dark:bg-white/5'}`}>
-            <Upload className={`w-7 h-7 ${isDragActive ? 'text-brand-500' : 'text-gray-400'}`} />
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-colors ${isDragActive ? 'bg-primary/20' : 'bg-secondary'}`}>
+            <Upload className={`w-7 h-7 ${isDragActive ? 'text-primary' : 'text-muted-foreground'}`} />
           </div>
           <div>
-            <p className="text-base font-medium text-gray-800 dark:text-gray-200">
+            <p className="text-base font-medium text-gray-900 dark:text-white">
               {isDragActive ? 'Drop files here...' : label}
             </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               {sublabel || `or click to browse • Max ${maxSizeMB}MB${multiple ? ` • Up to ${maxFiles} files` : ''}`}
             </p>
           </div>
           <div className="flex gap-2 flex-wrap justify-center">
             {acceptedTypes.map((type) => (
-              <span key={type} className="text-xs px-2 py-1 rounded-lg bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400">
+              <span key={type} className="text-xs px-2 py-1 rounded-lg bg-secondary text-muted-foreground">
                 {type.split('/')[1]?.toUpperCase() || type}
               </span>
             ))}
@@ -112,7 +112,7 @@ export function FileDropzone({
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="flex items-center gap-2 text-sm text-red-500 bg-red-50 dark:bg-red-950/30 rounded-xl px-4 py-3"
+            className="flex items-center gap-2 text-sm text-red-500 bg-red-500/10 rounded-xl px-4 py-3"
           >
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
             {error}
@@ -123,7 +123,7 @@ export function FileDropzone({
       {/* File list */}
       {showPreview && files.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <p className="text-sm font-medium text-gray-900 dark:text-white">
             {files.length} file{files.length > 1 ? 's' : ''} selected
           </p>
           <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -134,22 +134,22 @@ export function FileDropzone({
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/5"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border transition-colors duration-300"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-brand-50 dark:bg-brand-950/30 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                     {isImage(file) ? (
-                      <Image className="w-5 h-5 text-brand-500" />
+                      <Image className="w-5 h-5 text-primary" />
                     ) : (
-                      <FileText className="w-5 h-5 text-brand-500" />
+                      <FileText className="w-5 h-5 text-primary" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{file.name}</p>
-                    <p className="text-xs text-gray-500">{formatBytes(file.size)}</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">{formatBytes(file.size)}</p>
                   </div>
                   <button
                     onClick={() => removeFile(i)}
-                    className="w-7 h-7 rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors"
+                    className="w-7 h-7 rounded-lg hover:bg-secondary flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>

@@ -1,12 +1,12 @@
 'use client';
-// src/app/page.tsx
+// src/app/page.tsx — Theme-aware
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Navbar } from '@/components/layout/navbar';
 import { Footer } from '@/components/layout/footer';
 import { PricingSection } from '@/components/pricing-section';
 import {
-  ArrowRight, Zap, FileText, Sparkles, Brain, BookOpen, MessageSquare
+  ArrowRight, FileText, Sparkles, Brain, BookOpen, MessageSquare
 } from 'lucide-react';
 
 const pdfTools = [
@@ -27,13 +27,13 @@ const aiFeatures = [
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-white dark:bg-surface-dark">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <Navbar />
 
       {/* Hero */}
-      <section className="relative overflow-hidden bg-hero-gradient pt-24 pb-20 lg:pt-32 lg:pb-28 border-b border-gray-200 dark:border-white/5">
+      <section className="relative overflow-hidden bg-hero-gradient pt-24 pb-20 lg:pt-32 lg:pb-28 border-b border-border">
         {/* Background glow effects */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-brand-500/10 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
 
         <div className="section-container relative z-10">
           <div className="text-center max-w-4xl mx-auto">
@@ -41,7 +41,7 @@ export default function HomePage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
-              className="text-4xl sm:text-5xl lg:text-7xl font-bold text-white mb-6 leading-tight"
+              className="text-4xl sm:text-5xl lg:text-7xl font-bold text-foreground mb-6 leading-tight"
             >
               The Smartest PDF
               <br />
@@ -52,7 +52,7 @@ export default function HomePage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="text-lg text-gray-400 mb-8 max-w-2xl mx-auto"
+              className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto"
             >
               Merge, compress, convert PDFs — then supercharge your workflow with AI summaries,
               document chat, flashcards, and auto-generated quizzes. Built for students & professionals.
@@ -78,7 +78,7 @@ export default function HomePage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5 }}
-              className="mt-4 text-sm text-gray-500"
+              className="mt-4 text-sm text-muted-foreground"
             >
               No credit card required • 10 AI summaries free daily • 50 PDF operations free
             </motion.p>
@@ -87,13 +87,13 @@ export default function HomePage() {
       </section>
 
       {/* PDF Tools Grid */}
-      <section className="py-20 bg-gray-50 dark:bg-surface-dark-2">
+      <section className="py-20 bg-secondary/30">
         <div className="section-container">
           <div className="text-center mb-12">
-            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+            <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
               All the PDF Tools You Need
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 max-w-xl mx-auto">
+            <p className="text-muted-foreground max-w-xl mx-auto">
               Professional-grade PDF processing — fast, secure, and free to use.
             </p>
           </div>
@@ -108,12 +108,12 @@ export default function HomePage() {
                 viewport={{ once: true }}
               >
                 <Link href={tool.href} className="feature-card block group">
-                  <div className="w-12 h-12 rounded-xl bg-[#10B981]/10 border border-[#10B981]/20 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform duration-200">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform duration-200">
                     {tool.icon}
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{tool.name}</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{tool.desc}</p>
-                  <div className="mt-4 flex items-center gap-1 text-[#10B981] text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                  <h3 className="text-lg font-semibold text-foreground mb-2">{tool.name}</h3>
+                  <p className="text-sm text-muted-foreground">{tool.desc}</p>
+                  <div className="mt-4 flex items-center gap-1 text-primary text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
                     Try now <ArrowRight className="w-3.5 h-3.5" />
                   </div>
                 </Link>
@@ -124,13 +124,13 @@ export default function HomePage() {
       </section>
 
       {/* AI Features */}
-      <section className="py-20 dark:bg-surface-dark">
+      <section className="py-20">
         <div className="section-container">
           <div className="text-center mb-12">
-            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+            <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
               Study Smarter with AI
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 max-w-xl mx-auto">
+            <p className="text-muted-foreground max-w-xl mx-auto">
               Upload your notes or textbooks and let AI do the heavy lifting — summaries, flashcards, quizzes, and more.
             </p>
           </div>
@@ -148,15 +148,15 @@ export default function HomePage() {
                 >
                   <Link href={feature.href} className="feature-card block group">
                     <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-[#10B981]/10 border border-[#10B981]/20 flex items-center justify-center flex-shrink-0 group-hover:border-[#10B981]/40 transition-colors">
-                        <Icon className="w-6 h-6 text-[#10B981]" />
+                      <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0 group-hover:border-primary/40 transition-colors">
+                        <Icon className="w-6 h-6 text-primary" />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-lg font-semibold text-[#FFFFFF]">{feature.name}</h3>
-                          <span className="text-xs bg-[#10B981]/10 text-[#10B981] px-2 py-0.5 rounded-full">{feature.badge}</span>
+                          <h3 className="text-lg font-semibold text-foreground">{feature.name}</h3>
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold">{feature.badge}</span>
                         </div>
-                        <p className="text-sm text-gray-400">{feature.desc}</p>
+                        <p className="text-sm text-muted-foreground">{feature.desc}</p>
                       </div>
                     </div>
                   </Link>
@@ -171,12 +171,12 @@ export default function HomePage() {
       <PricingSection />
 
       {/* CTA */}
-      <section className="py-20 bg-[#111827] border-t border-[#1F2937] relative overflow-hidden">
+      <section className="py-20 bg-card border-t border-border relative overflow-hidden transition-colors duration-300">
         <div className="section-container relative z-10 text-center">
-          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
+          <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
             Ready to Get Started?
           </h2>
-          <p className="text-[#9CA3AF] mb-8 max-w-lg mx-auto">
+          <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
             Join thousands of students and professionals who use PDFAI Hub every day.
           </p>
           <Link href="/auth/register" className="btn-brand inline-flex items-center gap-2">

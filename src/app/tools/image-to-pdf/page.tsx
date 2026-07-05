@@ -1,5 +1,5 @@
 'use client';
-// src/app/tools/image-to-pdf/page.tsx
+// src/app/tools/image-to-pdf/page.tsx — Theme-aware
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -102,7 +102,7 @@ export default function ImageToPDFPage() {
         {/* Image grid with drag reorder */}
         {files.length > 0 && status === 'idle' && (
           <div>
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <p className="text-sm font-medium text-muted-foreground mb-3 font-sans">
               {files.length} image{files.length > 1 ? 's' : ''} — drag to reorder:
             </p>
             <DragDropContext onDragEnd={onDragEnd}>
@@ -120,12 +120,12 @@ export default function ImageToPDFPage() {
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
-                            className={`relative w-24 h-24 rounded-xl overflow-hidden border border-[#1F2937] transition-all cursor-grab ${
-                              snapshot.isDragging ? 'border-[#10B981] shadow-lg scale-105' : ''
+                            className={`relative w-24 h-24 rounded-xl overflow-hidden border border-border bg-card transition-colors duration-300 cursor-grab ${
+                              snapshot.isDragging ? 'border-primary shadow-lg scale-105' : ''
                             }`}
                           >
                             <img src={previews[i]} alt={file.name} className="w-full h-full object-cover" />
-                            <div className="absolute bottom-0 left-0 right-0 bg-black/50 py-0.5">
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 py-0.5">
                               <p className="text-white text-center text-[10px] font-medium">{i + 1}</p>
                             </div>
                           </div>
@@ -141,7 +141,7 @@ export default function ImageToPDFPage() {
         )}
 
         {files.length > 0 && status === 'idle' && (
-          <button onClick={handleConvert} className="btn-brand w-full py-3.5">
+          <button onClick={handleConvert} className="btn-brand w-full py-3.5 cursor-pointer">
             Convert to PDF
           </button>
         )}

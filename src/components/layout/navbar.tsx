@@ -1,5 +1,5 @@
 'use client';
-// src/components/layout/navbar.tsx — Hydration-safe
+// src/components/layout/navbar.tsx — Theme-aware
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
@@ -28,7 +28,7 @@ const aiTools = [
 
 export function Navbar() {
   const { data: session } = useSession();
-  const { theme, setTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -49,15 +49,15 @@ export function Navbar() {
   return (
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? 'glass border-b border-white/10' : 'bg-transparent'
+        scrolled ? 'glass border-b border-border' : 'bg-transparent'
       }`}
     >
       <div className="section-container">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 font-bold text-xl flex-shrink-0">
-            <div className="w-8 h-8 bg-[#10B981] rounded-lg flex items-center justify-center">
-              <FileText className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+              <FileText className="w-4 h-4 text-primary-foreground" />
             </div>
             <span className="gradient-text">PDFAI Hub</span>
           </Link>
@@ -70,7 +70,7 @@ export function Navbar() {
               onMouseEnter={() => setToolsOpen(true)}
               onMouseLeave={() => setToolsOpen(false)}
             >
-              <button className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+              <button className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors">
                 <FileText className="w-4 h-4" />
                 PDF Tools
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${toolsOpen ? 'rotate-180' : ''}`} />
@@ -82,17 +82,17 @@ export function Navbar() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 6 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute top-full left-0 mt-1 w-64 glass rounded-2xl p-2 shadow-xl border border-white/10"
+                    className="absolute top-full left-0 mt-1 w-64 glass rounded-2xl p-2 shadow-xl border border-border"
                   >
                     {pdfTools.map((tool) => (
                       <Link
                         key={tool.href}
                         href={tool.href}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-700 dark:text-gray-300 hover:bg-white/10 hover:text-gray-900 dark:hover:text-white transition-colors"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
                       >
                         <span>{tool.icon}</span>
                         <span className="flex-1">{tool.name}</span>
-                        <span className="text-[10px] bg-green-500/15 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded-full">Free</span>
+                        <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-semibold">Free</span>
                       </Link>
                     ))}
                   </motion.div>
@@ -106,7 +106,7 @@ export function Navbar() {
               onMouseEnter={() => setAiOpen(true)}
               onMouseLeave={() => setAiOpen(false)}
             >
-              <button className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+              <button className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors">
                 <Zap className="w-4 h-4" />
                 AI Features
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${aiOpen ? 'rotate-180' : ''}`} />
@@ -118,17 +118,17 @@ export function Navbar() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 6 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute top-full left-0 mt-1 w-56 glass rounded-2xl p-2 shadow-xl border border-white/10"
+                    className="absolute top-full left-0 mt-1 w-56 glass rounded-2xl p-2 shadow-xl border border-border"
                   >
                     {aiTools.map((tool) => (
                       <Link
                         key={tool.href}
                         href={tool.href}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-700 dark:text-gray-300 hover:bg-white/10 hover:text-gray-900 dark:hover:text-white transition-colors"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
                       >
                         <span>{tool.icon}</span>
                         <span className="flex-1">{tool.name}</span>
-                        <span className="text-[10px] bg-accent-500/15 text-accent-500 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                        <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full flex items-center gap-0.5 font-semibold">
                           <Sparkles className="w-2.5 h-2.5" /> AI
                         </span>
                       </Link>
@@ -138,7 +138,7 @@ export function Navbar() {
               </AnimatePresence>
             </div>
 
-            <Link href="/pricing" className="px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+            <Link href="/pricing" className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors">
               Pricing
             </Link>
           </div>
@@ -148,11 +148,11 @@ export function Navbar() {
             {/* Theme toggle — only after mount to prevent hydration mismatch */}
             {mounted && (
               <button
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="w-9 h-9 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors cursor-pointer"
                 aria-label="Toggle theme"
               >
-                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                {resolvedTheme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
             )}
 
@@ -163,7 +163,7 @@ export function Navbar() {
                 onMouseEnter={() => setUserOpen(true)}
                 onMouseLeave={() => setUserOpen(false)}
               >
-                <button className="flex items-center gap-2 px-3 py-1.5 rounded-xl glass border border-white/10 hover:border-white/20 transition-colors">
+                <button className="flex items-center gap-2 px-3 py-1.5 rounded-xl glass border border-border hover:border-border/85 transition-colors">
                   {session.user.image ? (
                     <img
                       src={session.user.image}
@@ -172,17 +172,17 @@ export function Navbar() {
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <div className="w-7 h-7 rounded-full bg-[#10B981] flex items-center justify-center text-white text-xs font-bold">
+                    <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
                       {session.user.name?.[0]?.toUpperCase() || 'U'}
                     </div>
                   )}
-                  <span className="text-sm font-medium text-gray-900 dark:text-white hidden sm:block max-w-[100px] truncate">
+                  <span className="text-sm font-medium text-foreground hidden sm:block max-w-[100px] truncate">
                     {session.user.name?.split(' ')[0]}
                   </span>
                   {session.user.plan === 'PRO' && (
-                    <span className="text-[10px] bg-[#10B981] text-white px-1.5 py-0.5 rounded-full font-bold">PRO</span>
+                    <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold">PRO</span>
                   )}
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
                 </button>
 
                 <AnimatePresence>
@@ -192,11 +192,11 @@ export function Navbar() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 6 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute right-0 top-full mt-1 w-56 glass rounded-2xl p-2 shadow-xl border border-white/10"
+                      className="absolute right-0 top-full mt-1 w-56 glass rounded-2xl p-2 shadow-xl border border-border"
                     >
-                      <div className="px-3 py-2.5 border-b border-white/10 mb-1">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{session.user.name}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{session.user.email}</p>
+                      <div className="px-3 py-2.5 border-b border-border mb-1">
+                        <p className="text-sm font-medium text-foreground truncate">{session.user.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{session.user.email}</p>
                       </div>
                       {[
                         { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -206,7 +206,7 @@ export function Navbar() {
                         <Link
                           key={item.href}
                           href={item.href}
-                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-700 dark:text-gray-300 hover:bg-white/10 hover:text-gray-900 dark:hover:text-white transition-colors"
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
                         >
                           <item.icon className="w-4 h-4" />
                           {item.label}
@@ -215,16 +215,16 @@ export function Navbar() {
                       {session.user.role === 'ADMIN' && (
                         <Link
                           href="/admin"
-                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-950/30 transition-colors"
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-primary hover:bg-secondary transition-colors"
                         >
                           <Shield className="w-4 h-4" />
                           Admin Panel
                         </Link>
                       )}
-                      <div className="border-t border-white/10 mt-1 pt-1">
+                      <div className="border-t border-border mt-1 pt-1">
                         <button
                           onClick={() => signOut({ callbackUrl: '/' })}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-500 hover:bg-destructive/10 transition-colors"
                         >
                           <LogOut className="w-4 h-4" />
                           Sign out
@@ -238,7 +238,7 @@ export function Navbar() {
               <div className="hidden md:flex items-center gap-2">
                 <Link
                   href="/auth/login"
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Sign in
                 </Link>
@@ -251,7 +251,7 @@ export function Navbar() {
             {/* Mobile menu button */}
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="md:hidden w-9 h-9 rounded-lg flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+              className="md:hidden w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
               aria-label="Toggle menu"
             >
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -268,17 +268,17 @@ export function Navbar() {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
-            className="md:hidden overflow-hidden glass border-t border-white/10"
+            className="md:hidden overflow-hidden glass border-t border-border"
           >
             <div className="section-container py-4 space-y-1 max-h-[80vh] overflow-y-auto">
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-3 py-1 uppercase tracking-wider">
+              <p className="text-xs font-semibold text-muted-foreground px-3 py-1 uppercase tracking-wider">
                 PDF Tools — Free, No Login
               </p>
               {pdfTools.map((tool) => (
                 <Link
                   key={tool.href}
                   href={tool.href}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-700 dark:text-gray-300 hover:bg-white/5 transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
                   onClick={closeMobile}
                 >
                   <span>{tool.icon}</span>
@@ -286,41 +286,41 @@ export function Navbar() {
                 </Link>
               ))}
 
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-3 py-1 uppercase tracking-wider mt-3">
+              <p className="text-xs font-semibold text-muted-foreground px-3 py-1 uppercase tracking-wider mt-3">
                 AI Features
               </p>
               {aiTools.map((tool) => (
                 <Link
                   key={tool.href}
                   href={tool.href}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-700 dark:text-gray-300 hover:bg-white/5 transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
                   onClick={closeMobile}
                 >
                   <span>{tool.icon}</span>
                   {tool.name}
-                  <span className="text-xs text-accent-400 ml-auto">Login req.</span>
+                  <span className="text-xs text-primary ml-auto font-semibold">Login req.</span>
                 </Link>
               ))}
 
-              <div className="border-t border-white/10 pt-3 mt-3 space-y-2">
-                <Link href="/pricing" className="block px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white" onClick={closeMobile}>
+              <div className="border-t border-border pt-3 mt-3 space-y-2">
+                <Link href="/pricing" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground" onClick={closeMobile}>
                   Pricing
                 </Link>
                 {session ? (
                   <>
-                    <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2 text-sm" onClick={closeMobile}>
+                    <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground" onClick={closeMobile}>
                       <LayoutDashboard className="w-4 h-4" /> Dashboard
                     </Link>
                     <button
                       onClick={() => { signOut({ callbackUrl: '/' }); closeMobile(); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-destructive/10"
                     >
                       <LogOut className="w-4 h-4" /> Sign out
                     </button>
                   </>
                 ) : (
                   <div className="flex gap-2 px-1">
-                    <Link href="/auth/login" className="flex-1 text-center py-2.5 text-sm rounded-xl border border-white/10 text-gray-300" onClick={closeMobile}>
+                    <Link href="/auth/login" className="flex-1 text-center py-2.5 text-sm rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-secondary" onClick={closeMobile}>
                       Sign in
                     </Link>
                     <Link href="/auth/register" className="flex-1 btn-brand text-sm py-2.5 text-center" onClick={closeMobile}>

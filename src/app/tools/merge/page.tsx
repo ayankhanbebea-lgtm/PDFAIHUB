@@ -1,5 +1,5 @@
 'use client';
-// src/app/tools/merge/page.tsx
+// src/app/tools/merge/page.tsx — Theme-aware
 import { useState } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import toast from 'react-hot-toast';
@@ -98,7 +98,7 @@ export default function MergePage() {
         {/* Drag to reorder */}
         {files.length > 1 && status === 'idle' && (
           <div>
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <p className="text-sm font-medium text-muted-foreground mb-3">
               Drag to reorder files:
             </p>
             <DragDropContext onDragEnd={onDragEnd}>
@@ -111,26 +111,26 @@ export default function MergePage() {
                           <li
                             ref={provided.innerRef}
                             {...provided.draggableProps}
-                            className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                            className={`flex items-center gap-3 p-3 rounded-xl border transition-colors duration-300 ${
                               snapshot.isDragging
-                                ? 'border-[#10B981] bg-[#10B981]/10 shadow-lg'
-                                : 'border-[#1F2937] bg-[#161B22]'
+                                ? 'border-primary bg-primary/10 shadow-lg'
+                                : 'border-border bg-card'
                             }`}
                           >
                             <span
                               {...provided.dragHandleProps}
-                              className="drag-handle text-gray-400 hover:text-gray-200"
+                              className="drag-handle text-muted-foreground hover:text-foreground"
                             >
                               <GripVertical className="w-4 h-4" />
                             </span>
-                            <span className="w-6 h-6 rounded-full bg-[#10B981]/15 text-[#10B981] text-xs font-bold flex items-center justify-center flex-shrink-0">
+                            <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center flex-shrink-0">
                               {i + 1}
                             </span>
-                            <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                             <span className="flex-1 text-sm font-medium text-gray-900 dark:text-white truncate">
                               {file.name}
                             </span>
-                            <span className="text-xs text-gray-400">{formatBytes(file.size)}</span>
+                            <span className="text-xs text-muted-foreground/80">{formatBytes(file.size)}</span>
                           </li>
                         )}
                       </Draggable>
@@ -145,7 +145,7 @@ export default function MergePage() {
 
         {/* Merge button */}
         {files.length >= 2 && status === 'idle' && (
-          <button onClick={handleMerge} className="btn-brand w-full py-3.5 flex items-center justify-center gap-2">
+          <button onClick={handleMerge} className="btn-brand w-full py-3.5 flex items-center justify-center gap-2 cursor-pointer">
             <Merge className="w-4 h-4" />
             Merge {files.length} PDFs
           </button>

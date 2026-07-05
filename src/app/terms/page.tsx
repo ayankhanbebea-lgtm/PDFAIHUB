@@ -1,4 +1,4 @@
-// src/app/terms/page.tsx
+// src/app/terms/page.tsx — Theme-aware
 import type { Metadata } from 'next';
 import { Navbar } from '@/components/layout/navbar';
 import { Footer } from '@/components/layout/footer';
@@ -61,20 +61,20 @@ export default function TermsOfServicePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-[#FFFFFF]">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <Navbar />
 
       <main className="pt-24 pb-20">
         {/* Header */}
-        <section className="relative overflow-hidden bg-hero-gradient py-12 border-b border-gray-200 dark:border-white/5">
+        <section className="relative overflow-hidden bg-hero-gradient py-12 border-b border-border transition-colors duration-300">
           <div className="section-container relative z-10 max-w-4xl mx-auto">
-            <span className="text-xs bg-[#10B981]/15 text-[#10B981] px-3.5 py-1.5 rounded-full font-semibold uppercase tracking-wider">
+            <span className="text-xs bg-primary/10 text-primary px-3.5 py-1.5 rounded-full font-semibold uppercase tracking-wider">
               Legal Center
             </span>
-            <h1 className="text-4xl font-bold mt-4 mb-2 text-white">
+            <h1 className="text-4xl font-bold mt-4 mb-2 text-foreground">
               Terms of Service
             </h1>
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-muted-foreground">
               Last Updated: July 5, 2026
             </p>
           </div>
@@ -85,8 +85,8 @@ export default function TermsOfServicePage() {
           <div className="section-container max-w-4xl mx-auto">
             <div className="grid grid-cols-1 gap-8">
               {/* Introduction */}
-              <div className="bg-[#161B22] border border-[#1F2937] p-6 sm:p-8 rounded-2xl">
-                <p className="text-sm sm:text-base text-gray-300 leading-relaxed">
+              <div className="bg-card border border-border p-6 sm:p-8 rounded-2xl transition-colors duration-300">
+                <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
                   Please read these Terms of Service carefully before using PDFAI Hub. By accessing or using our website, you agree to comply with and be bound by the conditions described below. These terms apply to all visitors, registered users, and premium subscribers.
                 </p>
               </div>
@@ -95,14 +95,14 @@ export default function TermsOfServicePage() {
               {terms.map((term, idx) => {
                 const Icon = term.icon;
                 return (
-                  <div key={idx} className="bg-[#161B22] border border-[#1F2937] p-6 sm:p-8 rounded-2xl space-y-4">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/25 flex items-center justify-center flex-shrink-0">
+                  <div key={idx} className="bg-card border border-border p-6 sm:p-8 rounded-2xl space-y-4 transition-colors duration-300">
+                    <h2 className="text-xl font-bold text-foreground flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary border border-primary/25 flex items-center justify-center flex-shrink-0">
                         <Icon className="w-4.5 h-4.5" />
                       </div>
                       {term.title}
                     </h2>
-                    <div className="text-sm text-gray-300 leading-relaxed pl-12">
+                    <div className="text-sm text-muted-foreground leading-relaxed pl-12">
                       {term.content}
                     </div>
                   </div>
@@ -110,11 +110,11 @@ export default function TermsOfServicePage() {
               })}
 
               {/* Intellectual Property and Changes */}
-              <div className="bg-[#161B22] border border-[#1F2937] p-6 sm:p-8 rounded-2xl space-y-4">
-                <h2 className="text-xl font-bold text-white pl-12">
+              <div className="bg-card border border-border p-6 sm:p-8 rounded-2xl space-y-4 transition-colors duration-300">
+                <h2 className="text-xl font-bold text-foreground pl-12">
                   Intellectual Property & Changes to Terms
                 </h2>
-                <div className="text-sm text-gray-300 leading-relaxed pl-12 space-y-4">
+                <div className="text-sm text-muted-foreground leading-relaxed pl-12 space-y-4">
                   <p>
                     <strong>Intellectual Property:</strong> The code, design, branding, and proprietary assets of PDFAI Hub belong exclusively to the site developers and are protected under international copyright and trademark laws. You may not duplicate, copy, or reuse any portion of our visual designs or backend code without express written consent.
                   </p>
@@ -125,14 +125,14 @@ export default function TermsOfServicePage() {
               </div>
 
               {/* Contact Email */}
-              <div className="bg-[#10B981]/5 border border-[#10B981]/20 p-6 sm:p-8 rounded-2xl text-center space-y-3">
-                <h3 className="text-lg font-bold text-white">Questions About Our Terms of Service?</h3>
-                <p className="text-sm text-gray-400 max-w-lg mx-auto">
+              <div className="bg-primary/5 border border-primary/20 p-6 sm:p-8 rounded-2xl text-center space-y-3 transition-colors duration-300">
+                <h3 className="text-lg font-bold text-foreground">Questions About Our Terms of Service?</h3>
+                <p className="text-sm text-muted-foreground max-w-lg mx-auto">
                   If you have legal inquiries, billing questions, or require clarity regarding acceptable use guidelines, please contact our legal desk.
                 </p>
                 <a
                   href="mailto:pdfaihub@gmail.com"
-                  className="inline-block text-base font-bold text-[#10B981] hover:underline"
+                  className="inline-block text-base font-bold text-primary hover:underline"
                 >
                   pdfaihub@gmail.com
                 </a>

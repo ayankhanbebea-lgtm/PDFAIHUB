@@ -1,5 +1,5 @@
 'use client';
-// src/app/tools/compress/page.tsx
+// src/app/tools/compress/page.tsx — Theme-aware
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { ToolLayout } from '@/components/tools/tool-layout';
@@ -81,8 +81,6 @@ export default function CompressPage() {
     }
   };
 
-
-
   const reset = () => {
     setFiles([]);
     setStatus('idle');
@@ -112,28 +110,28 @@ export default function CompressPage() {
         {/* Compression level */}
         {files.length > 0 && status === 'idle' && (
           <div>
-            <p className="text-sm font-medium text-[#9CA3AF] mb-3">Compression Level:</p>
+            <p className="text-sm font-medium text-muted-foreground mb-3">Compression Level:</p>
             <div className="grid grid-cols-3 gap-3">
               {levels.map((l) => (
                 <button
                   key={l.id}
                   onClick={() => setLevel(l.id as any)}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${
+                  className={`p-4 rounded-xl border-2 text-left transition-all cursor-pointer ${
                     level === l.id
-                      ? 'border-[#10B981] bg-[#10B981]/10 text-white'
-                      : 'border-[#1F2937] hover:border-[#374151]'
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border text-muted-foreground hover:border-border/80 hover:text-foreground'
                   }`}
                 >
-                  <p className="font-semibold text-sm text-white">{l.label}</p>
-                  <p className="text-xs text-[#9CA3AF] mt-0.5">{l.desc}</p>
-                  <p className="text-xs text-[#10B981] mt-1 font-medium">{l.reduction}</p>
+                  <p className="font-semibold text-sm text-gray-900 dark:text-white">{l.label}</p>
+                  <p className="text-xs text-muted-foreground/80 mt-0.5">{l.desc}</p>
+                  <p className="text-xs text-primary mt-1 font-medium">{l.reduction}</p>
                 </button>
               ))}
             </div>
           </div>
         )}
         {files.length > 0 && status === 'idle' && (
-          <button onClick={handleCompress} className="btn-brand w-full py-3.5">
+          <button onClick={handleCompress} className="btn-brand w-full py-3.5 cursor-pointer">
             Compress PDF
           </button>
         )}
@@ -150,8 +148,8 @@ export default function CompressPage() {
         />
 
         {status === 'completed' && engine && (
-          <div className="rounded-2xl p-5 border border-white/10 bg-white/5 space-y-2">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Compression Diagnostics</h4>
+          <div className="rounded-2xl p-5 border border-border bg-card space-y-2 transition-colors duration-300">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Compression Diagnostics</h4>
             <div className="text-sm space-y-1">
               <p className="text-gray-700 dark:text-gray-300">
                 <span className="font-medium text-gray-900 dark:text-white">Engine: </span>

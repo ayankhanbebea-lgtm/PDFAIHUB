@@ -1,5 +1,5 @@
 'use client';
-// src/app/tools/split/page.tsx
+// src/app/tools/split/page.tsx — Theme-aware
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, Trash2, Download } from 'lucide-react';
@@ -54,7 +54,6 @@ export default function SplitPage() {
 
       setProgress(100);
       setStatus('completed');
-      // Map dataUrl → url so the existing JSX keeps working
       setResults(data.files.map((f: any) => ({ ...f, url: f.dataUrl })));
       setMessage(`PDF split into ${data.files.length} parts`);
       toast.success('PDF split successfully!');
@@ -65,7 +64,6 @@ export default function SplitPage() {
       toast.error(msg);
     }
   };
-
 
   const reset = () => {
     setFiles([]); setStatus('idle'); setProgress(0);
@@ -82,39 +80,39 @@ export default function SplitPage() {
           <>
             <div>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-[#9CA3AF]">Page Ranges</p>
-                <button onClick={addRange} className="flex items-center gap-1 text-sm text-[#10B981] hover:text-[#059669]">
+                <p className="text-sm font-medium text-muted-foreground">Page Ranges</p>
+                <button onClick={addRange} className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 cursor-pointer">
                   <Plus className="w-4 h-4" /> Add Range
                 </button>
               </div>
               <div className="space-y-3">
                 {ranges.map((range, i) => (
-                  <div key={i} className="flex items-center gap-3 p-4 rounded-xl bg-[#161B22] border border-[#1F2937]">
+                  <div key={i} className="flex items-center gap-3 p-4 rounded-xl bg-card border border-border transition-colors duration-300">
                     <div className="flex-1 grid grid-cols-3 gap-3">
                       <div>
-                        <label className="text-xs text-[#6B7280] block mb-1">Start Page</label>
+                        <label className="text-xs text-muted-foreground/60 block mb-1">Start Page</label>
                         <input type="number" min={1} value={range.start}
                           onChange={(e) => updateRange(i, 'start', parseInt(e.target.value) || 1)}
-                          className="w-full px-3 py-2 rounded-lg bg-[#111827] border border-[#1F2937] text-sm text-white focus:outline-none focus:border-[#10B981]"
+                          className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-[#6B7280] block mb-1">End Page</label>
+                        <label className="text-xs text-muted-foreground/60 block mb-1">End Page</label>
                         <input type="number" min={1} value={range.end}
                           onChange={(e) => updateRange(i, 'end', parseInt(e.target.value) || 1)}
-                          className="w-full px-3 py-2 rounded-lg bg-[#111827] border border-[#1F2937] text-sm text-white focus:outline-none focus:border-[#10B981]"
+                          className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-[#6B7280] block mb-1">Name</label>
+                        <label className="text-xs text-muted-foreground/60 block mb-1">Name</label>
                         <input type="text" value={range.name}
                           onChange={(e) => updateRange(i, 'name', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-[#111827] border border-[#1F2937] text-sm text-white focus:outline-none focus:border-[#10B981]"
+                          className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
                         />
                       </div>
                     </div>
                     {ranges.length > 1 && (
-                      <button onClick={() => removeRange(i)} className="p-2 rounded-lg hover:bg-red-950/20 text-red-400 transition-colors">
+                      <button onClick={() => removeRange(i)} className="p-2 rounded-lg hover:bg-destructive/10 text-red-500 transition-colors cursor-pointer">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     )}
@@ -122,25 +120,25 @@ export default function SplitPage() {
                 ))}
               </div>
             </div>
-            <button onClick={handleSplit} className="btn-brand w-full py-3.5">Split PDF</button>
+            <button onClick={handleSplit} className="btn-brand w-full py-3.5 cursor-pointer">Split PDF</button>
           </>
         )}
 
         {status === 'completed' && results.length > 0 && (
           <div className="space-y-3">
-            <p className="text-sm font-medium text-[#9CA3AF]">Download Split Files:</p>
+            <p className="text-sm font-medium text-muted-foreground">Download Split Files:</p>
             {results.map((r, i) => (
-              <div key={i} className="flex items-center justify-between p-4 bg-[#161B22] border border-[#1F2937] rounded-xl">
+              <div key={i} className="flex items-center justify-between p-4 bg-card border border-border rounded-xl transition-colors duration-300">
                 <div>
-                  <p className="text-sm font-medium text-white">{r.name}</p>
-                  <p className="text-xs text-[#6B7280]">{r.pageCount} page{r.pageCount > 1 ? 's' : ''}</p>
+                  <p className="text-sm font-medium text-foreground">{r.name}</p>
+                  <p className="text-xs text-muted-foreground/60">{r.pageCount} page{r.pageCount > 1 ? 's' : ''}</p>
                 </div>
-                <a href={r.url} download={r.name} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#10B981] text-white text-sm hover:bg-[#059669] transition-colors">
+                <a href={r.url} download={r.name} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors cursor-pointer">
                   <Download className="w-3.5 h-3.5" /> Download
                 </a>
               </div>
             ))}
-            <button onClick={reset} className="btn-ghost w-full py-2.5 text-sm">Split Another PDF</button>
+            <button onClick={reset} className="btn-ghost w-full py-2.5 text-sm cursor-pointer">Split Another PDF</button>
           </div>
         )}
         <UploadProgress progress={progress} status={status === 'completed' ? 'idle' : status} message={message} onReset={reset} />

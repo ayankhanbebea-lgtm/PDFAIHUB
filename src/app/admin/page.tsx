@@ -1,5 +1,5 @@
 'use client';
-// src/app/admin/page.tsx
+// src/app/admin/page.tsx — Theme-aware
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -75,25 +75,25 @@ export default function AdminPage() {
   const statCards = stats ? [
     { label: 'Total Users', value: stats.stats.totalUsers, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
     { label: 'Pro Users', value: stats.stats.proUsers, icon: Crown, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { label: 'Total Files', value: stats.stats.totalFiles, icon: FileText, color: 'text-brand-500', bg: 'bg-brand-500/10' },
+    { label: 'Total Files', value: stats.stats.totalFiles, icon: FileText, color: 'text-primary', bg: 'bg-primary/10' },
     { label: 'Monthly Revenue', value: `₹${stats.stats.monthlyRevenue.toLocaleString()}`, icon: DollarSign, color: 'text-green-500', bg: 'bg-green-500/10' },
     { label: 'New Users Today', value: stats.stats.newUsersToday, icon: Activity, color: 'text-purple-500', bg: 'bg-purple-500/10' },
     { label: 'Usage Today', value: stats.stats.usageToday, icon: BarChart3, color: 'text-rose-500', bg: 'bg-rose-500/10' },
   ] : [];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-surface-dark">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <Navbar />
       <main className="pt-20">
         <div className="section-container py-8">
           {/* Header */}
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-accent-500 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+              <Shield className="w-5 h-5 text-primary-foreground" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
-              <p className="text-sm text-gray-500">Manage users, subscriptions, and monitor the platform</p>
+              <p className="text-sm text-muted-foreground">Manage users, subscriptions, and monitor the platform</p>
             </div>
           </div>
 
@@ -103,10 +103,10 @@ export default function AdminPage() {
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors capitalize ${
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors capitalize cursor-pointer ${
                   tab === t
-                    ? 'bg-brand-500 text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-secondary'
                 }`}
               >
                 {t}
@@ -127,10 +127,10 @@ export default function AdminPage() {
                           key={stat.label}
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="glass rounded-2xl p-5 border border-white/5"
+                          className="bg-card rounded-2xl p-5 border border-border transition-colors duration-300"
                         >
                           <div className="flex items-center justify-between mb-3">
-                            <p className="text-sm text-gray-500">{stat.label}</p>
+                            <p className="text-sm text-muted-foreground">{stat.label}</p>
                             <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center`}>
                               <Icon className={`w-4 h-4 ${stat.color}`} />
                             </div>
@@ -143,19 +143,19 @@ export default function AdminPage() {
 
               {/* Tool usage chart */}
               {stats?.toolUsage?.length > 0 && (
-                <div className="glass rounded-2xl p-6 border border-white/5 mb-8">
+                <div className="bg-card rounded-2xl p-6 border border-border mb-8 transition-colors duration-300">
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Tool Usage</h3>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={stats.toolUsage}>
                       <XAxis dataKey="type" tick={{ fontSize: 11, fill: '#9ca3af' }} />
                       <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} />
                       <Tooltip
-                        contentStyle={{ background: '#1a1a24', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
-                        labelStyle={{ color: '#e2e8f0' }}
+                        contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px' }}
+                        labelStyle={{ color: 'var(--foreground)' }}
                       />
                       <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                         {stats.toolUsage.map((_: any, i: number) => (
-                          <Cell key={i} fill={i % 2 === 0 ? '#4f6bff' : '#ff30a8'} />
+                          <Cell key={i} fill={i % 2 === 0 ? '#10B981' : '#3B82F6'} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -164,24 +164,24 @@ export default function AdminPage() {
               )}
 
               {/* Recent users */}
-              <div className="glass rounded-2xl border border-white/5 overflow-hidden">
-                <div className="p-5 border-b border-white/5">
+              <div className="bg-card rounded-2xl border border-border overflow-hidden transition-colors duration-300">
+                <div className="p-5 border-b border-border">
                   <h3 className="font-semibold text-gray-900 dark:text-white">Recent Signups</h3>
                 </div>
-                <div className="divide-y divide-white/5">
+                <div className="divide-y divide-border">
                   {stats?.recentUsers?.map((user: any) => (
-                    <div key={user.id} className="flex items-center gap-4 p-4 hover:bg-white/2">
-                      <div className="w-9 h-9 rounded-full bg-brand-500/20 flex items-center justify-center text-sm font-bold text-brand-400">
+                    <div key={user.id} className="flex items-center gap-4 p-4 hover:bg-secondary/40 transition-colors">
+                      <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary">
                         {user.name?.[0]?.toUpperCase() || 'U'}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{user.name || 'Unknown'}</p>
-                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded-full ${user.plan === 'PRO' ? 'bg-brand-500/20 text-brand-400' : 'bg-gray-100 dark:bg-white/5 text-gray-500'}`}>
+                      <span className={`text-xs px-2 py-1 rounded-full ${user.plan === 'PRO' ? 'bg-primary/20 text-primary' : 'bg-secondary text-muted-foreground'}`}>
                         {user.plan}
                       </span>
-                      <span className="text-xs text-gray-400">{formatDate(user.createdAt)}</span>
+                      <span className="text-xs text-muted-foreground">{formatDate(user.createdAt)}</span>
                     </div>
                   ))}
                 </div>
@@ -194,19 +194,19 @@ export default function AdminPage() {
               {/* Filters */}
               <div className="flex gap-3 mb-6">
                 <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search users..."
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-brand-400"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground focus:outline-none focus:border-primary placeholder-muted-foreground/60 transition-colors duration-300"
                   />
                 </div>
                 <select
                   value={planFilter}
                   onChange={(e) => setPlanFilter(e.target.value)}
-                  className="px-3 py-2.5 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm text-gray-900 dark:text-white focus:outline-none"
+                  className="px-3 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground focus:outline-none transition-colors duration-300 cursor-pointer"
                 >
                   <option value="">All Plans</option>
                   <option value="FREE">Free</option>
@@ -215,52 +215,52 @@ export default function AdminPage() {
               </div>
 
               {/* Users table */}
-              <div className="glass rounded-2xl border border-white/5 overflow-hidden">
+              <div className="bg-card rounded-2xl border border-border overflow-hidden transition-colors duration-300">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-white/5 text-left">
-                        <th className="px-5 py-3.5 font-medium text-gray-500">User</th>
-                        <th className="px-5 py-3.5 font-medium text-gray-500">Plan</th>
-                        <th className="px-5 py-3.5 font-medium text-gray-500">Files</th>
-                        <th className="px-5 py-3.5 font-medium text-gray-500">Status</th>
-                        <th className="px-5 py-3.5 font-medium text-gray-500">Joined</th>
-                        <th className="px-5 py-3.5 font-medium text-gray-500 text-right">Actions</th>
+                      <tr className="border-b border-border text-left">
+                        <th className="px-5 py-3.5 font-medium text-muted-foreground">User</th>
+                        <th className="px-5 py-3.5 font-medium text-muted-foreground">Plan</th>
+                        <th className="px-5 py-3.5 font-medium text-muted-foreground">Files</th>
+                        <th className="px-5 py-3.5 font-medium text-muted-foreground">Status</th>
+                        <th className="px-5 py-3.5 font-medium text-muted-foreground">Joined</th>
+                        <th className="px-5 py-3.5 font-medium text-muted-foreground text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/5">
+                    <tbody className="divide-y divide-border">
                       {users.map((user) => (
-                        <tr key={user.id} className="hover:bg-white/2 transition-colors">
+                        <tr key={user.id} className="hover:bg-secondary/40 transition-colors">
                           <td className="px-5 py-3.5">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-brand-500/20 flex items-center justify-center text-xs font-bold text-brand-400">
+                              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
                                 {user.name?.[0]?.toUpperCase() || 'U'}
                               </div>
                               <div>
                                 <p className="font-medium text-gray-900 dark:text-white">{user.name || '—'}</p>
-                                <p className="text-xs text-gray-500">{user.email}</p>
+                                <p className="text-xs text-muted-foreground">{user.email}</p>
                               </div>
                             </div>
                           </td>
                           <td className="px-5 py-3.5">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.plan === 'PRO' ? 'bg-brand-500/20 text-brand-400' : 'bg-gray-100 dark:bg-white/5 text-gray-500'}`}>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.plan === 'PRO' ? 'bg-primary/20 text-primary' : 'bg-secondary text-muted-foreground'}`}>
                               {user.plan}
                             </span>
                           </td>
-                          <td className="px-5 py-3.5 text-gray-500">{user._count?.files || 0}</td>
+                          <td className="px-5 py-3.5 text-muted-foreground">{user._count?.files || 0}</td>
                           <td className="px-5 py-3.5">
                             <span className={`px-2 py-1 rounded-full text-xs ${user.banned ? 'bg-red-100 dark:bg-red-950/30 text-red-500' : 'bg-green-100 dark:bg-green-950/30 text-green-500'}`}>
                               {user.banned ? 'Banned' : 'Active'}
                             </span>
                           </td>
-                          <td className="px-5 py-3.5 text-gray-500 text-xs">{formatDate(user.createdAt)}</td>
+                          <td className="px-5 py-3.5 text-muted-foreground text-xs">{formatDate(user.createdAt)}</td>
                           <td className="px-5 py-3.5">
                             <div className="flex items-center gap-1 justify-end">
                               {user.banned ? (
                                 <button
                                   onClick={() => userAction(user.id, 'unban')}
                                   disabled={actionLoading === user.id}
-                                  className="p-1.5 rounded-lg hover:bg-green-100 dark:hover:bg-green-950/30 text-green-500 transition-colors"
+                                  className="p-1.5 rounded-lg hover:bg-green-500/10 text-green-500 transition-colors cursor-pointer"
                                   title="Unban"
                                 >
                                   <CheckCircle className="w-4 h-4" />
@@ -269,7 +269,7 @@ export default function AdminPage() {
                                 <button
                                   onClick={() => userAction(user.id, 'ban')}
                                   disabled={actionLoading === user.id}
-                                  className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-950/30 text-red-500 transition-colors"
+                                  className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors cursor-pointer"
                                   title="Ban"
                                 >
                                   <Ban className="w-4 h-4" />
@@ -279,7 +279,7 @@ export default function AdminPage() {
                                 <button
                                   onClick={() => userAction(user.id, 'setPlan', { plan: 'PRO' })}
                                   disabled={actionLoading === user.id}
-                                  className="p-1.5 rounded-lg hover:bg-brand-100 dark:hover:bg-brand-950/30 text-brand-500 transition-colors"
+                                  className="p-1.5 rounded-lg hover:bg-primary/10 text-primary transition-colors cursor-pointer"
                                   title="Grant Pro"
                                 >
                                   <Crown className="w-4 h-4" />
@@ -288,7 +288,7 @@ export default function AdminPage() {
                                 <button
                                   onClick={() => userAction(user.id, 'setPlan', { plan: 'FREE' })}
                                   disabled={actionLoading === user.id}
-                                  className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 text-gray-400 transition-colors"
+                                  className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground transition-colors cursor-pointer"
                                   title="Revoke Pro"
                                 >
                                   <Trash2 className="w-4 h-4" />

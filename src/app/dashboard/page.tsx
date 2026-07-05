@@ -1,5 +1,5 @@
 'use client';
-// src/app/dashboard/page.tsx
+// src/app/dashboard/page.tsx — Theme-aware
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -8,7 +8,7 @@ import axios from 'axios';
 import { motion } from 'framer-motion';
 import {
   FileText, Zap, ArrowRight, Download,
-  Brain, TrendingUp, Clock, Plus, Lock, HelpCircle
+  Brain, TrendingUp, Clock, Plus
 } from 'lucide-react';
 import { Navbar } from '@/components/layout/navbar';
 import { Footer } from '@/components/layout/footer';
@@ -90,8 +90,8 @@ export default function DashboardPage() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-surface-dark">
-        <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground transition-colors duration-300">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -110,7 +110,7 @@ export default function DashboardPage() {
   const aiRemaining = isPro ? '∞' : (usage?.aiRemaining ?? 10);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-surface-dark">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <Navbar />
       <main className="pt-20 pb-16">
         <div className="section-container py-8">
@@ -119,7 +119,7 @@ export default function DashboardPage() {
             <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
               Welcome back, {session.user.name?.split(' ')[0] || 'there'} 👋
             </h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
               {isPro
                 ? '⚡ Pro Plan — Unlimited AI & PDF operations'
                 : 'Free plan — 50 PDF operations + 10 AI requests per rolling 24 hours'}
@@ -131,13 +131,13 @@ export default function DashboardPage() {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-6 bg-[#161B22] rounded-2xl p-5 border border-[#10B981]/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+              className="mb-6 bg-card rounded-2xl p-5 border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors duration-300"
             >
               <div className="flex items-center gap-3">
-                <Zap className="w-6 h-6 text-[#10B981] flex-shrink-0" />
+                <Zap className="w-6 h-6 text-primary flex-shrink-0" />
                 <div>
-                  <p className="font-semibold text-white">Upgrade to Pro</p>
-                  <p className="text-sm text-[#9CA3AF]">Unlimited AI & PDF operations, priority processing</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">Upgrade to Pro</p>
+                  <p className="text-sm text-muted-foreground">Unlimited AI & PDF operations, priority processing</p>
                 </div>
               </div>
               <Link href="/pricing" className="btn-brand py-2.5 px-5 text-sm flex items-center gap-2 whitespace-nowrap">
@@ -149,43 +149,43 @@ export default function DashboardPage() {
           {/* Stats Cards Grid */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {/* Card 1: Plan */}
-            <div className="bg-[#161B22] rounded-2xl p-5 border border-[#1F2937] flex flex-col justify-between">
+            <div className="bg-card rounded-2xl p-5 border border-border flex flex-col justify-between transition-colors duration-300">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-[#9CA3AF]">Plan</p>
-                <Zap className="w-4 h-4 text-[#10B981]" />
+                <p className="text-sm text-muted-foreground">Plan</p>
+                <Zap className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-xl font-bold text-white">{isPro ? '⚡ Pro' : 'Free'}</p>
-              {!isPro && <span className="text-[10px] text-[#6B7280] mt-1">₹0 / forever</span>}
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{isPro ? '⚡ Pro' : 'Free'}</p>
+              {!isPro && <span className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">₹0 / forever</span>}
             </div>
 
             {/* Card 2: PDF Usage */}
-            <div className="bg-[#161B22] rounded-2xl p-5 border border-[#1F2937] flex flex-col justify-between">
+            <div className="bg-card rounded-2xl p-5 border border-border flex flex-col justify-between transition-colors duration-300">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-[#9CA3AF]">PDF Usage</p>
-                <TrendingUp className="w-4 h-4 text-[#10B981]" />
+                <p className="text-sm text-muted-foreground">PDF Usage</p>
+                <TrendingUp className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-xl font-bold text-white">{pdfUsed} / {pdfLimit}</p>
-              <span className="text-[10px] text-[#6B7280] mt-1">{isPro ? 'Unlimited remaining' : `${pdfRemaining} operations left`}</span>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{pdfUsed} / {pdfLimit}</p>
+              <span className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">{isPro ? 'Unlimited remaining' : `${pdfRemaining} operations left`}</span>
             </div>
 
             {/* Card 3: AI Usage */}
-            <div className="bg-[#161B22] rounded-2xl p-5 border border-[#1F2937] flex flex-col justify-between">
+            <div className="bg-card rounded-2xl p-5 border border-border flex flex-col justify-between transition-colors duration-300">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-[#9CA3AF]">AI Usage</p>
-                <Brain className="w-4 h-4 text-[#10B981]" />
+                <p className="text-sm text-muted-foreground">AI Usage</p>
+                <Brain className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-xl font-bold text-white">{aiUsed} / {aiLimit}</p>
-              <span className="text-[10px] text-[#6B7280] mt-1">{isPro ? 'Unlimited remaining' : `${aiRemaining} requests left`}</span>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{aiUsed} / {aiLimit}</p>
+              <span className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">{isPro ? 'Unlimited remaining' : `${aiRemaining} requests left`}</span>
             </div>
 
             {/* Card 4: Next Reset */}
-            <div className="bg-[#161B22] rounded-2xl p-5 border border-[#1F2937] flex flex-col justify-between">
+            <div className="bg-card rounded-2xl p-5 border border-border flex flex-col justify-between transition-colors duration-300">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-[#9CA3AF]">Resets In</p>
-                <Clock className="w-4 h-4 text-[#10B981]" />
+                <p className="text-sm text-muted-foreground">Resets In</p>
+                <Clock className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-xl font-bold text-white">{isPro ? 'Never' : (countdown || 'Active')}</p>
-              <span className="text-[10px] text-[#6B7280] mt-1">{isPro ? 'No limits apply' : 'Rolling 24h timer'}</span>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{isPro ? 'Never' : (countdown || 'Active')}</p>
+              <span className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">{isPro ? 'No limits apply' : 'Rolling 24h timer'}</span>
             </div>
           </div>
 
@@ -213,19 +213,19 @@ export default function DashboardPage() {
                       >
                         <span className="text-2xl">🔒</span>
                         <div>
-                          <p className="text-xs font-medium text-gray-400 line-through">{action.name}</p>
+                          <p className="text-xs font-medium text-muted-foreground line-through">{action.name}</p>
                           <p className="text-[9px] text-amber-500 font-semibold mt-0.5">Quota Limit</p>
                         </div>
                       </div>
                     ) : (
                       <Link
                         href={action.href}
-                        className="bg-[#161B22] rounded-2xl p-4 flex flex-col items-center gap-2 text-center hover:shadow-card-hover hover:-translate-y-0.5 transition-all border border-[#1F2937] hover:border-[#10B981]/20 group"
+                        className="bg-card rounded-2xl p-4 flex flex-col items-center gap-2 text-center hover:shadow-card-hover hover:-translate-y-0.5 transition-all border border-border hover:border-primary/20 group"
                       >
                         <span className="text-2xl group-hover:scale-110 transition-transform">{action.icon}</span>
                         <div>
-                          <p className="text-xs font-medium text-white">{action.name}</p>
-                          <p className="text-[10px] text-[#9CA3AF] mt-0.5">{action.category.toUpperCase()}</p>
+                          <p className="text-xs font-medium text-gray-900 dark:text-white">{action.name}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{action.category.toUpperCase()}</p>
                         </div>
                       </Link>
                     )}
@@ -238,11 +238,11 @@ export default function DashboardPage() {
           {/* Recent Files */}
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Clock className="w-5 h-5 text-[#9CA3AF]" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Clock className="w-5 h-5 text-muted-foreground" />
                 Recent Files
               </h2>
-              <Link href="/dashboard/files" className="text-sm text-[#10B981] hover:text-[#059669] flex items-center gap-1 transition-colors">
+              <Link href="/dashboard/files" className="text-sm text-primary hover:text-primary/80 flex items-center gap-1 transition-colors">
                 View all <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -254,10 +254,10 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : files.length === 0 ? (
-              <div className="bg-[#161B22] rounded-2xl p-12 text-center border border-[#1F2937]">
-                <FileText className="w-12 h-12 text-[#6B7280] mx-auto mb-3" />
-                <p className="text-white font-medium mb-1">No files yet</p>
-                <p className="text-sm text-[#9CA3AF] mb-4">Start with any tool above</p>
+              <div className="bg-card rounded-2xl p-12 text-center border border-border transition-colors duration-300">
+                <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-gray-900 dark:text-white font-medium mb-1">No files yet</p>
+                <p className="text-sm text-muted-foreground mb-4">Start with any tool above</p>
                 <Link href="/tools/merge" className="btn-brand text-sm py-2 px-4 inline-flex items-center gap-2">
                   <Plus className="w-4 h-4" /> Process First File
                 </Link>
@@ -267,19 +267,19 @@ export default function DashboardPage() {
                 {files.map((file) => (
                   <div
                     key={file.id}
-                    className="bg-[#161B22] rounded-xl p-4 border border-[#1F2937] flex items-center gap-4 hover:border-[#10B981]/20 transition-colors group"
+                    className="bg-card rounded-xl p-4 border border-border flex items-center gap-4 hover:border-primary/20 transition-all duration-300 group"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-[#10B981]/10 flex items-center justify-center text-xl flex-shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl flex-shrink-0">
                       {toolEmoji[file.tool] || '📄'}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{file.originalName}</p>
-                      <p className="text-xs text-[#9CA3AF] mt-0.5">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{file.originalName}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {toolLabels[file.tool] || file.tool} • {formatBytes(file.size)} • {formatRelativeTime(file.createdAt)}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={`text-xs px-2 py-1 rounded-full hidden sm:block bg-[#10B981]/10 text-[#10B981]`}>
+                      <span className={`text-xs px-2 py-1 rounded-full hidden sm:block bg-primary/10 text-primary`}>
                         {file.status === 'COMPLETED' ? '✓' : file.status}
                       </span>
                       {file.resultUrl && (
@@ -288,7 +288,7 @@ export default function DashboardPage() {
                           download
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-[#10B981]/10 text-gray-400 hover:text-[#10B981] transition-all"
+                          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all cursor-pointer"
                         >
                           <Download className="w-4 h-4" />
                         </a>

@@ -34,7 +34,7 @@ export function LimitModal({ isOpen, onClose, type, resetInMs }: LimitModalProps
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          className="absolute inset-0 dark:bg-black/60 bg-black/40 backdrop-blur-sm"
         />
 
         {/* Modal Content */}
@@ -42,19 +42,19 @@ export function LimitModal({ isOpen, onClose, type, resetInMs }: LimitModalProps
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white p-8 shadow-2xl dark:bg-surface-dark border border-white/5"
+          className="relative w-full max-w-md overflow-hidden rounded-3xl bg-card p-8 shadow-2xl border border-border transition-colors duration-300"
         >
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+            className="absolute top-4 right-4 p-2 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-secondary transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
 
           {/* Icon */}
           <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 rounded-2xl bg-brand-500/10 flex items-center justify-center text-brand-500 animate-pulse">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary animate-pulse">
               <AlertTriangle className="w-8 h-8" />
             </div>
           </div>
@@ -64,16 +64,16 @@ export function LimitModal({ isOpen, onClose, type, resetInMs }: LimitModalProps
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
               Limit Reached
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
               {limitText}
             </p>
           </div>
 
           {/* Timer Card */}
-          <div className="bg-gray-50 dark:bg-white/5 rounded-2xl p-4 flex items-center justify-center gap-3 mb-6 border border-gray-100 dark:border-white/5">
-            <Clock className="w-5 h-5 text-brand-500" />
-            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Resets in: <span className="text-brand-500 font-bold">{countdownText}</span>
+          <div className="bg-secondary rounded-2xl p-4 flex items-center justify-center gap-3 mb-6 border border-border">
+            <Clock className="w-5 h-5 text-primary" />
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+              Resets in: <span className="text-primary font-bold">{countdownText}</span>
             </span>
           </div>
 
@@ -82,13 +82,13 @@ export function LimitModal({ isOpen, onClose, type, resetInMs }: LimitModalProps
             <Link
               href="/pricing"
               onClick={onClose}
-              className="w-full btn-brand py-3 text-center rounded-xl font-bold flex items-center justify-center gap-2 shadow-glow-brand"
+              className="w-full btn-brand py-3 text-center rounded-xl font-bold flex items-center justify-center gap-2 shadow-glow-brand cursor-pointer"
             >
               <Zap className="w-4 h-4 fill-current" /> Upgrade to Pro
             </Link>
             <button
               onClick={onClose}
-              className="w-full py-3 text-center rounded-xl border border-gray-300 dark:border-white/10 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+              className="w-full py-3 text-center rounded-xl border border-border text-foreground font-medium hover:bg-secondary transition-colors cursor-pointer"
             >
               Wait for Reset
             </button>
