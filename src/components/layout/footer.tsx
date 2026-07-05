@@ -23,9 +23,10 @@ const footerLinks = {
     { name: 'Blog', href: '/blog' },
     { name: 'About', href: '/about' },
     { name: 'Contact', href: '/contact' },
+    { name: 'Credits', href: '/credits' },
   ],
   Legal: [
-    { name: 'Privacy Policy', href: '/privacy' },
+    { name: 'Privacy Policy', href: '/privacy-policy' },
     { name: 'Terms of Service', href: '/terms' },
     { name: 'Cookie Policy', href: '/cookies' },
   ],
@@ -79,7 +80,7 @@ export function Footer() {
             © {new Date().getFullYear()} PDFAI Hub. All rights reserved.
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Built with ❤️ for students and professionals worldwide
+            Created by <span className="font-semibold text-white">Ezio (Ayan)</span>
           </p>
         </div>
       </div>

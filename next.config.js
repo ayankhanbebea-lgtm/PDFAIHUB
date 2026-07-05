@@ -3,6 +3,8 @@ const nextConfig = {
   // Fix for pdf-parse, sharp, and AI PDF processing packages
   serverExternalPackages: ['pdf-parse', 'sharp', 'mammoth', 'canvas', 'muhammara', 'pdfjs-dist', 'tesseract.js', 'mupdf'],
 
+
+
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'res.cloudinary.com' },
