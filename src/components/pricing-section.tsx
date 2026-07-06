@@ -1,6 +1,6 @@
 'use client';
 // src/components/pricing-section.tsx — Theme-aware
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
@@ -12,15 +12,35 @@ export function PricingSection() {
   const { data: session } = useSession();
   const [loadingPlan, setLoadingPlan] = useState<'monthly' | 'yearly' | null>(null);
   const [provider, setProvider] = useState<'stripe' | 'razorpay'>('razorpay');
+  const [subscription, setSubscription] = useState<any>(null);
+
+  useEffect(() => {
+    if (session) {
+      axios.get('/api/user/subscription')
+        .then(({ data }) => setSubscription(data.subscription))
+        .catch(console.error);
+    }
+  }, [session]);
+
+  const isMonthlyActive = subscription?.status === 'ACTIVE' && (subscription?.providerPlanId === 'monthly' || subscription?.planType === 'monthly');
+  const isYearlyActive = subscription?.status === 'ACTIVE' && (subscription?.providerPlanId === 'yearly' || subscription?.planType === 'yearly');
 
   const handleUpgrade = async (planType: 'monthly' | 'yearly') => {
     if (!session) {
       window.location.href = `/auth/register?redirect=/pricing`;
       return;
     }
+    
+    const activePlan = subscription?.providerPlanId || subscription?.planType;
     if (session.user.plan === 'PRO') {
-      toast.success('You are already on Pro!');
-      return;
+      if (activePlan === 'yearly') {
+        toast.success('You already own the highest plan!');
+        return;
+      }
+      if (planType === 'monthly') {
+        toast.success('You are already on Pro!');
+        return;
+      }
     }
 
     setLoadingPlan(planType);
@@ -220,16 +240,29 @@ export function PricingSection() {
                 ))}
               </ul>
             </div>
-            <button
-              onClick={() => handleUpgrade('monthly')}
-              disabled={loadingPlan !== null}
-              className="w-full py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold transition-colors disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {loadingPlan === 'monthly' ? (
-                <span className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-              ) : null}
-              {session?.user?.plan === 'PRO' ? 'Upgrade Plan' : 'Buy Monthly'}
-            </button>
+            {isMonthlyActive ? (
+              <div className="text-center w-full py-3 rounded-xl border border-primary/20 bg-primary/5 text-primary font-bold">
+                Current Plan
+                <span className="block text-xs font-normal text-muted-foreground mt-1">
+                  Active until: {new Date(subscription.currentPeriodEnd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </span>
+              </div>
+            ) : isYearlyActive ? (
+              <div className="text-center w-full py-3 rounded-xl border border-border bg-secondary/50 text-muted-foreground font-medium text-sm">
+                You already own the highest plan.
+              </div>
+            ) : (
+              <button
+                onClick={() => handleUpgrade('monthly')}
+                disabled={loadingPlan !== null}
+                className="w-full py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold transition-colors disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {loadingPlan === 'monthly' ? (
+                  <span className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                ) : null}
+                Buy Monthly
+              </button>
+            )}
           </motion.div>
 
           {/* Card 3: Pro Yearly (Billed annually) */}
@@ -264,16 +297,36 @@ export function PricingSection() {
                 ))}
               </ul>
             </div>
-            <button
-              onClick={() => handleUpgrade('yearly')}
-              disabled={loadingPlan !== null}
-              className="w-full py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold transition-colors disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {loadingPlan === 'yearly' ? (
-                <span className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-              ) : null}
-              {session?.user?.plan === 'PRO' ? 'Upgrade Plan' : 'Buy Yearly'}
-            </button>
+            {isYearlyActive ? (
+              <div className="text-center w-full py-3 rounded-xl border border-primary/20 bg-primary/5 text-primary font-bold">
+                ✓ Yearly Active
+                <span className="block text-xs font-normal text-muted-foreground mt-1">
+                  Expires: {new Date(subscription.currentPeriodEnd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </span>
+              </div>
+            ) : isMonthlyActive ? (
+              <button
+                onClick={() => handleUpgrade('yearly')}
+                disabled={loadingPlan !== null}
+                className="w-full py-3 rounded-xl bg-primary hover:bg-primary/95 text-primary-foreground font-bold transition-colors disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer shadow-glow-brand"
+              >
+                {loadingPlan === 'yearly' ? (
+                  <span className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                ) : null}
+                Upgrade to Yearly (Get 13 Months!)
+              </button>
+            ) : (
+              <button
+                onClick={() => handleUpgrade('yearly')}
+                disabled={loadingPlan !== null}
+                className="w-full py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold transition-colors disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {loadingPlan === 'yearly' ? (
+                  <span className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                ) : null}
+                Buy Yearly
+              </button>
+            )}
           </motion.div>
         </div>
       </div>

@@ -153,6 +153,13 @@ model Subscription {
   currentPeriodStart DateTime
   currentPeriodEnd   DateTime
   cancelAtPeriodEnd  Boolean            @default(false)
+  planType           String?
+  startDate          DateTime?
+  expiryDate         DateTime?
+  nextBillingDate    DateTime?
+  paymentId          String?
+  orderId            String?
+  subscriptionId     String?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 

@@ -80,11 +80,6 @@ export async function incrementUsage(
 
   if (!user) throw new Error('User not found');
 
-  // PRO users have unlimited usage
-  if (user.plan === 'PRO') {
-    return { allowed: true, remaining: Infinity, limit: Infinity, resetInMs: 0 };
-  }
-
   const now = new Date();
   const lastResetTime = new Date(user.lastReset).getTime();
   const timeElapsed = now.getTime() - lastResetTime;
@@ -123,15 +118,16 @@ export async function incrementUsage(
     },
   });
 
+  const isPro = user.plan === 'PRO';
   const limit = type === 'ai' ? FREE_AI_LIMIT : FREE_PDF_LIMIT;
   const currentUsed = type === 'ai' ? newAiUsed : newPdfUsed;
-  const remaining = Math.max(0, limit - currentUsed);
-  const resetInMs = Math.max(0, WINDOW_MS - (now.getTime() - newLastReset.getTime()));
+  const remaining = isPro ? Infinity : Math.max(0, limit - currentUsed);
+  const resetInMs = isPro ? 0 : Math.max(0, WINDOW_MS - (now.getTime() - newLastReset.getTime()));
 
   return {
-    allowed: remaining > 0,
+    allowed: true,
     remaining,
-    limit,
+    limit: isPro ? Infinity : limit,
     resetInMs,
   };
 }

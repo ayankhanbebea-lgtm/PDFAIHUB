@@ -42,6 +42,7 @@ export default function DashboardPage() {
   const [files, setFiles] = useState<any[]>([]);
   const [filesLoading, setFilesLoading] = useState(true);
   const [usage, setUsage] = useState<any>(null);
+  const [subscription, setSubscription] = useState<any>(null);
   const [countdown, setCountdown] = useState<string>('');
 
   useEffect(() => {
@@ -60,6 +61,10 @@ export default function DashboardPage() {
 
       axios.get('/api/user/usage')
         .then(({ data }) => setUsage(data))
+        .catch(console.error);
+
+      axios.get('/api/user/subscription')
+        .then(({ data }) => setSubscription(data.subscription))
         .catch(console.error);
     }
   }, [status]);
@@ -154,8 +159,14 @@ export default function DashboardPage() {
                 <p className="text-sm text-muted-foreground">Plan</p>
                 <Zap className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-xl font-bold text-gray-900 dark:text-white">{isPro ? '⚡ Pro' : 'Free'}</p>
-              {!isPro && <span className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">₹0 / forever</span>}
+              <p className="text-xl font-bold text-gray-900 dark:text-white">
+                {isPro 
+                  ? (subscription?.planType === 'yearly' || subscription?.providerPlanId === 'yearly' ? 'Pro Yearly' : 'Pro Monthly')
+                  : 'Free'}
+              </p>
+              <span className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">
+                {isPro ? `Status: ${subscription?.status || 'Active'}` : '₹0 / forever'}
+              </span>
             </div>
 
             {/* Card 2: PDF Usage */}
@@ -164,8 +175,12 @@ export default function DashboardPage() {
                 <p className="text-sm text-muted-foreground">PDF Usage</p>
                 <TrendingUp className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-xl font-bold text-gray-900 dark:text-white">{pdfUsed} / {pdfLimit}</p>
-              <span className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">{isPro ? 'Unlimited remaining' : `${pdfRemaining} operations left`}</span>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">
+                {pdfUsed} / {isPro ? 'Unlimited' : pdfLimit}
+              </p>
+              <span className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">
+                {isPro ? 'Unlimited remaining' : `${pdfRemaining} operations left`}
+              </span>
             </div>
 
             {/* Card 3: AI Usage */}
@@ -174,19 +189,45 @@ export default function DashboardPage() {
                 <p className="text-sm text-muted-foreground">AI Usage</p>
                 <Brain className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-xl font-bold text-gray-900 dark:text-white">{aiUsed} / {aiLimit}</p>
-              <span className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">{isPro ? 'Unlimited remaining' : `${aiRemaining} requests left`}</span>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">
+                {aiUsed} / {isPro ? 'Unlimited' : aiLimit}
+              </p>
+              <span className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">
+                {isPro ? 'Unlimited remaining' : `${aiRemaining} requests left`}
+              </span>
             </div>
 
-            {/* Card 4: Next Reset */}
-            <div className="bg-card rounded-2xl p-5 border border-border flex flex-col justify-between transition-colors duration-300">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-muted-foreground">Resets In</p>
-                <Clock className="w-4 h-4 text-primary" />
+            {/* Card 4: Next Reset / Subscription info */}
+            {isPro && subscription ? (
+              <div className="bg-card rounded-2xl p-5 border border-border flex flex-col justify-between transition-colors duration-300">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-muted-foreground">Remaining</p>
+                  <Clock className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    {Math.max(0, Math.ceil((new Date(subscription.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} Days
+                  </p>
+                  <div className="text-[9px] text-muted-foreground mt-1 space-y-0.5">
+                    <p>Started: {new Date(subscription.currentPeriodStart).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                    <p>Expires: {new Date(subscription.currentPeriodEnd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                  </div>
+                </div>
               </div>
-              <p className="text-xl font-bold text-gray-900 dark:text-white">{isPro ? 'Never' : (countdown || 'Active')}</p>
-              <span className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">{isPro ? 'No limits apply' : 'Rolling 24h timer'}</span>
-            </div>
+            ) : (
+              <div className="bg-card rounded-2xl p-5 border border-border flex flex-col justify-between transition-colors duration-300">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-muted-foreground">Resets In</p>
+                  <Clock className="w-4 h-4 text-primary" />
+                </div>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">
+                  {countdown || 'Active'}
+                </p>
+                <span className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">
+                  Rolling 24h timer
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Quick Actions */}

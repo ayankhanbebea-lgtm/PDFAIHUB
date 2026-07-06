@@ -89,12 +89,41 @@ export async function fulfillOrder(
   userId: string,
   planType: 'monthly' | 'yearly',
   providerOrderId: string,
-  amount: number
+  amount: number,
+  paymentId?: string
 ): Promise<void> {
-  const durationDays = planType === 'yearly' ? 365 : 30;
   const currentPeriodStart = new Date();
   const currentPeriodEnd = new Date();
-  currentPeriodEnd.setDate(currentPeriodEnd.getDate() + durationDays);
+
+  if (planType === 'yearly') {
+    // Check if user has active monthly subscription
+    const activeMonthly = await prisma.subscription.findFirst({
+      where: {
+        userId,
+        status: 'ACTIVE',
+        OR: [
+          { providerPlanId: 'monthly' },
+          { planType: 'monthly' }
+        ]
+      },
+    });
+
+    if (activeMonthly) {
+      // Deactivate the old monthly subscription
+      await prisma.subscription.update({
+        where: { id: activeMonthly.id },
+        data: { status: 'CANCELLED' },
+      });
+      // Upgrade logic: extend by 13 months (395 days)
+      currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 13);
+    } else {
+      // Standard 12 months (365 days)
+      currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 12);
+    }
+  } else {
+    // Standard 1 month (30 days)
+    currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
+  }
 
   await prisma.$transaction([
     prisma.user.update({
@@ -112,11 +141,20 @@ export async function fulfillOrder(
         providerPlanId: planType,
         currentPeriodStart,
         currentPeriodEnd,
-        cancelAtPeriodEnd: true, // One-time charge does not auto-renew
+        cancelAtPeriodEnd: true,
+        // Audit columns
+        planType,
+        startDate: currentPeriodStart,
+        expiryDate: currentPeriodEnd,
+        nextBillingDate: currentPeriodEnd,
+        orderId: providerOrderId,
+        paymentId: paymentId || null,
       },
       update: {
         status: 'ACTIVE',
         currentPeriodEnd,
+        expiryDate: currentPeriodEnd,
+        paymentId: paymentId || null,
       },
     }),
     // Also save transaction log
@@ -126,6 +164,7 @@ export async function fulfillOrder(
         type: 'PAYMENT_SUCCESS',
         metadata: {
           orderId: providerOrderId,
+          paymentId: paymentId || null,
           planType,
           amount,
         },
@@ -150,9 +189,12 @@ export async function handleRazorpayWebhook(
     const planType = orderNotes.planType as 'monthly' | 'yearly';
     const orderId = event === 'order.paid' ? orderEntity.id : orderEntity.order_id;
     const amount = orderEntity.amount;
+    const paymentId = event === 'payment.captured' 
+      ? orderEntity.id 
+      : (payload.payload.payment?.entity?.id || undefined);
 
     if (userId && planType && orderId) {
-      await fulfillOrder(userId, planType, orderId, amount);
+      await fulfillOrder(userId, planType, orderId, amount, paymentId);
     }
   }
 }

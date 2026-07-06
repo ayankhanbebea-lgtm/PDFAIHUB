@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     const amount = PLAN_PRICES[planType as 'monthly' | 'yearly'];
-    await fulfillOrder(session.user.id, planType as 'monthly' | 'yearly', razorpayOrderId, amount);
+    await fulfillOrder(session.user.id, planType as 'monthly' | 'yearly', razorpayOrderId, amount, razorpayPaymentId);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
