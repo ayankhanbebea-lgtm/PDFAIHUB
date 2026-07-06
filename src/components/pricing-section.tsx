@@ -44,7 +44,7 @@ export function PricingSection() {
         document.body.appendChild(rzpScript);
 
         rzpScript.onload = () => {
-          const rzp = new (window as any).Razorpay({
+          const options = {
             key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
             amount: data.amount,
             currency: data.currency || 'INR',
@@ -85,7 +85,18 @@ export function PricingSection() {
                 setLoadingPlan(null);
               }
             }
+          };
+
+          console.log('[Razorpay Checkout initialized] Options object details:', {
+            key: options.key,
+            amount: options.amount,
+            currency: options.currency,
+            order_id: options.order_id,
+            planType,
+            prefill: options.prefill
           });
+
+          const rzp = new (window as any).Razorpay(options);
           rzp.open();
         };
       }

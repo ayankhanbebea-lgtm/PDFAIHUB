@@ -93,9 +93,33 @@ export const authOptions: NextAuthOptions = {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
-            select: { role: true, plan: true, banned: true, name: true, image: true },
+            select: { id: true, role: true, plan: true, banned: true, name: true, image: true },
           });
           if (dbUser) {
+            // Check if user has PRO plan but active subscription expired
+            if (dbUser.plan === 'PRO') {
+              const now = new Date();
+              const activeSub = await prisma.subscription.findFirst({
+                where: { userId: dbUser.id, status: 'ACTIVE' },
+                orderBy: { currentPeriodEnd: 'desc' },
+              });
+
+              if (!activeSub || activeSub.currentPeriodEnd < now) {
+                // Downgrade user to FREE in database
+                await prisma.user.update({
+                  where: { id: dbUser.id },
+                  data: { plan: 'FREE' },
+                });
+                if (activeSub) {
+                  await prisma.subscription.update({
+                    where: { id: activeSub.id },
+                    data: { status: 'EXPIRED' },
+                  });
+                }
+                dbUser.plan = 'FREE';
+              }
+            }
+
             token.role = dbUser.role;
             token.plan = dbUser.plan;
             if (dbUser.name) token.name = dbUser.name;

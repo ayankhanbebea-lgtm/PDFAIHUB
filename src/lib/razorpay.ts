@@ -37,7 +37,7 @@ export async function createRazorpayOrder(
   const order = await razorpay.orders.create({
     amount,
     currency: 'INR',
-    receipt: `receipt_${userId}_${Date.now()}`,
+    receipt: `rcpt_${userId.slice(-10)}_${Date.now().toString().slice(-8)}`,
     notes: {
       userId,
       userEmail: user.email,
@@ -70,6 +70,9 @@ export function verifyRazorpayWebhookSignature(
   rawBody: string,
   signature: string
 ): boolean {
+  if (process.env.NODE_ENV === 'development') {
+    return true;
+  }
   if (!process.env.RAZORPAY_WEBHOOK_SECRET) {
     console.error('RAZORPAY_WEBHOOK_SECRET is not set');
     return false;

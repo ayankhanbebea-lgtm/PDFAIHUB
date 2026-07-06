@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await createRazorpayOrder(session.user.id, planType);
+    console.log('[Razorpay Order Created on Server]:', result);
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('Razorpay order creation error:', error);
