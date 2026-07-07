@@ -138,6 +138,7 @@ export function PricingSection() {
   ];
 
   const proFeatures = [
+    { text: 'AI Exam Mode 🚀', badge: 'Most Popular', included: true },
     { text: 'Unlimited PDF operations', included: true },
     { text: 'All PDF Tools', included: true },
     { text: 'AI PDF Chat', included: true },
@@ -235,7 +236,14 @@ export function PricingSection() {
                 {proFeatures.map((f) => (
                   <li key={f.text} className="flex items-center gap-3 text-sm">
                     <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span className="text-muted-foreground">{f.text}</span>
+                    <span className="text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                      {f.text}
+                      {f.badge && (
+                        <span className="text-[9px] bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-pulse shadow-sm shadow-amber-500/10">
+                          {f.badge}
+                        </span>
+                      )}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -292,7 +300,14 @@ export function PricingSection() {
                 {proFeatures.map((f) => (
                   <li key={f.text} className="flex items-center gap-3 text-sm">
                     <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span className="text-muted-foreground">{f.text}</span>
+                    <span className="text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                      {f.text}
+                      {f.badge && (
+                        <span className="text-[9px] bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-pulse shadow-sm shadow-amber-500/10">
+                          {f.badge}
+                        </span>
+                      )}
+                    </span>
                   </li>
                 ))}
               </ul>

@@ -32,6 +32,7 @@ const aiTools = [
   { name: 'AI PDF Chat', href: '/ai/chat', icon: '💬' },
   { name: 'Flashcards', href: '/ai/flashcards', icon: '🃏' },
   { name: 'Quiz Generator', href: '/ai/quiz', icon: '❓' },
+  { name: 'AI Exam Mode', href: '/ai/exam', icon: '🎓', isPro: true },
 ];
 
 export function Navbar() {
@@ -173,9 +174,15 @@ export function Navbar() {
                       >
                         <span>{tool.icon}</span>
                         <span className="flex-1">{tool.name}</span>
-                        <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full flex items-center gap-0.5 font-semibold">
-                          <Sparkles className="w-2.5 h-2.5" /> AI
-                        </span>
+                        {tool.isPro ? (
+                          <span className="text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold">
+                            Pro
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full flex items-center gap-0.5 font-semibold">
+                            <Sparkles className="w-2.5 h-2.5" /> AI
+                          </span>
+                        )}
                       </Link>
                     ))}
                   </motion.div>
@@ -358,8 +365,12 @@ export function Navbar() {
                   onClick={closeMobile}
                 >
                   <span>{tool.icon}</span>
-                  {tool.name}
-                  <span className="text-xs text-primary ml-auto font-semibold">Login req.</span>
+                  <span className="flex-1">{tool.name}</span>
+                  {tool.isPro ? (
+                    <span className="text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold">Pro</span>
+                  ) : (
+                    <span className="text-xs text-primary ml-auto font-semibold">Login req.</span>
+                  )}
                 </Link>
               ))}
 

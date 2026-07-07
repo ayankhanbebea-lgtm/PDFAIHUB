@@ -60,6 +60,7 @@ model User {
   flashcards    Flashcard[]
   quizzes       Quiz[]
   chatSessions  ChatSession[]
+  examPackages  ExamPackage[]
 }
 
 model Account {
@@ -223,4 +224,34 @@ model Quiz {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ExamPackage {
+  id              String   @id @default(cuid())
+  userId          String
+  title           String
+  fileName        String
+  fileSize        Int
+  readinessScore  Int      // 0-100
+  studyTime       String   // e.g. "6h 20m"
+  questionsCount  Int      // e.g. 150
+  flashcardsCount Int      // e.g. 120
+  difficulty      String?  // e.g. "Medium", "Hard"
+  
+  // Package sections stored as JSON
+  smartNotes      Json?
+  importantTopics Json?
+  pysQuestions    Json?
+  mcqs            Json?
+  flashcards      Json?
+  revisionNotes   Json?
+  memoryTricks    Json?
+  mockTest        Json?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

@@ -210,3 +210,88 @@ ${pdfContent.slice(0, 10000)}`;
   const result = await chat.sendMessage(question);
   return result.response.text();
 }
+
+/**
+ * AI Exam Mode: Generates a complete exam preparation package from PDF text.
+ */
+export async function generateExamPackage(
+  text: string,
+  provider: string = 'groq'
+): Promise<any> {
+  const systemPrompt = `You are a world-class academic prep tutor. Create a comprehensive, premium exam preparation package from the provided textbook/notes text.
+Always respond with valid JSON only. Raw JSON only, no backticks, no markdown code blocks.`;
+
+  const prompt = `Analyze this textbook/notes text:
+${text.slice(0, 10000)}
+
+Generate a premium exam preparation package in the following JSON format. Make sure to populate every section with realistic study resources.
+
+JSON Structure:
+{
+  "readinessScore": 85, // Integer between 0 and 100 representing how complete the material is for an exam
+  "studyTime": "6h 20m", // Estimated study time based on length/difficulty
+  "questionsCount": 15,
+  "flashcardsCount": 10,
+  "difficulty": "Medium", // Easy, Medium, or Hard
+  "smartNotes": [
+    {
+      "chapter": "Chapter 1: Core Concepts",
+      "summary": "Full summary of the chapter's core concepts...",
+      "keyTakeaways": ["takeaway 1", "takeaway 2", "takeaway 3"]
+    }
+  ],
+  "importantTopics": [
+    {
+      "title": "Topic Title",
+      "importance": "High", // High, Medium, Low
+      "description": "Why this is important and what to look out for"
+    }
+  ],
+  "pysQuestions": [
+    {
+      "question": "Sample Previous Year exam question?",
+      "guidelines": "Step-by-step guidance on how to solve this"
+    }
+  ],
+  "mcqs": [
+    {
+      "question": "Question text?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctIndex": 0,
+      "explanation": "Detailed explanation of why this option is correct"
+    }
+  ],
+  "flashcards": [
+    {
+      "front": "Term / Question",
+      "back": "Definition / Answer"
+    }
+  ],
+  "revisionNotes": "A structured, concise Markdown format review of the entire material. Bulleted lists, bold text where appropriate.",
+  "memoryTricks": [
+    {
+      "concept": "Concept to remember",
+      "mnemonic": "e.g. PEMDAS",
+      "explanation": "How to apply this mnemonic"
+    }
+  ],
+  "mockTest": [
+    {
+      "question": "Mock exam question?",
+      "idealAnswer": "Ideal high-scoring answer guideline"
+    }
+  ]
+}`;
+
+  const responseText = await generateWithAI(prompt, systemPrompt, provider);
+
+  try {
+    // Strip backticks or markdown formatting if any exists
+    const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanJson);
+  } catch (err) {
+    console.error('[generateExamPackage] Failed to parse JSON from response:', responseText);
+    throw new Error('Failed to generate exam package. Please try again.');
+  }
+}
+

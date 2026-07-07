@@ -162,3 +162,26 @@ export interface ToolConfig {
   acceptedFiles: string[];
   maxFiles: number;
 }
+
+export interface ExamPackage {
+  id: string;
+  userId: string;
+  title: string;
+  fileName: string;
+  fileSize: number;
+  readinessScore: number;
+  studyTime: string;
+  questionsCount: number;
+  flashcardsCount: number;
+  difficulty: string | null;
+  smartNotes: any;
+  importantTopics: any;
+  pysQuestions: any;
+  mcqs: any;
+  flashcards: any;
+  revisionNotes: any;
+  memoryTricks: any;
+  mockTest: any;
+  createdAt: Date;
+}
+

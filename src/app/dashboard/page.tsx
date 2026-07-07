@@ -23,6 +23,7 @@ const quickActions = [
   { name: 'Rotate PDF', href: '/tools/rotate', icon: '🔄', category: 'pdf', isPro: true },
   { name: 'Organize', href: '/tools/organize', icon: '📊', category: 'pdf', isPro: true },
   { name: 'OCR Extract', href: '/tools/ocr', icon: '🔍', category: 'pdf', isPro: true },
+  { name: 'AI Exam Mode', href: '/ai/exam', icon: '🎓', category: 'ai', isPro: true },
   { name: 'AI Summary', href: '/ai/summarize', icon: '🤖', category: 'ai' },
   { name: 'AI Chat', href: '/ai/chat', icon: '💬', category: 'ai' },
   { name: 'Flashcards', href: '/ai/flashcards', icon: '🃏', category: 'ai' },
@@ -34,7 +35,7 @@ const toolLabels: Record<string, string> = {
   protect: 'PDF Protect', summarize: 'AI Summary',
   chat: 'AI Chat', flashcards: 'Flashcards', quiz: 'Quiz',
   unlock: 'PDF Unlock', watermark: 'PDF Watermark', rotate: 'PDF Rotate',
-  organize: 'PDF Organize', ocr: 'OCR Extract',
+  organize: 'PDF Organize', ocr: 'OCR Extract', exam: 'AI Exam Mode',
 };
 
 const toolEmoji: Record<string, string> = {
@@ -42,7 +43,7 @@ const toolEmoji: Record<string, string> = {
   'image-to-pdf': '🖼️', protect: '🔒', summarize: '🤖',
   chat: '💬', flashcards: '🃏', quiz: '❓',
   unlock: '🔓', watermark: '📝', rotate: '🔄',
-  organize: '📊', ocr: '🔍',
+  organize: '📊', ocr: '🔍', exam: '🎓',
 };
 
 export default function DashboardPage() {
@@ -237,6 +238,39 @@ export default function DashboardPage() {
                 </span>
               </div>
             )}
+          </div>
+
+          {/* Premium Card: AI Exam Mode */}
+          <div className="mb-8 bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-primary/10 rounded-3xl p-6 border border-amber-500/20 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6 transition-all duration-300">
+            {/* Background elements */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="flex items-center gap-4 relative z-10">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-3xl shadow-lg shadow-amber-500/10 flex-shrink-0">
+                🎓
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                    Pro Exclusive
+                  </span>
+                  <span className="text-[10px] bg-primary text-primary-foreground px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-pulse">
+                    New Flagship
+                  </span>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mt-1.5 flex items-center gap-1.5">
+                  AI Exam Mode
+                </h2>
+                <p className="text-sm text-muted-foreground mt-0.5 max-w-xl">
+                  Automatically generate smart notes, important topics, Previous Year style questions, MCQs, flashcards, mock tests, and difficulty analysis from any study PDF.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/ai/exam"
+              className="btn-brand bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-none text-white py-3 px-6 rounded-xl text-sm font-semibold flex items-center gap-2 whitespace-nowrap shadow-lg shadow-amber-500/20 hover:shadow-amber-500/35 transition-all duration-300 relative z-10"
+            >
+              Start Exam Prep <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
 
           {/* Quick Actions */}
