@@ -12,6 +12,8 @@ interface UploadProgressProps {
   downloadName?: string;
   resultSize?: number;
   originalSize?: number;
+  resultLabel?: string;
+  showReduction?: boolean;
   onReset?: () => void;
 }
 
@@ -23,6 +25,8 @@ export function UploadProgress({
   downloadName = 'result.pdf',
   resultSize,
   originalSize,
+  resultLabel = 'Output',
+  showReduction = false,
   onReset,
 }: UploadProgressProps) {
   if (status === 'idle') return null;
@@ -71,7 +75,7 @@ export function UploadProgress({
         {/* Completed state */}
         {status === 'completed' && downloadUrl && (
           <div className="space-y-3">
-            {reduction !== null && (
+            {(originalSize || resultSize) && (
               <div className="flex items-center gap-4 text-sm">
                 {originalSize && (
                   <div>
@@ -81,11 +85,11 @@ export function UploadProgress({
                 )}
                 {resultSize && (
                   <div>
-                    <p className="text-gray-500">Compressed</p>
+                    <p className="text-gray-500">{resultLabel}</p>
                     <p className="font-medium text-gray-900 dark:text-white">{formatBytes(resultSize)}</p>
                   </div>
                 )}
-                {reduction > 0 && (
+                {showReduction && reduction !== null && reduction > 0 && (
                   <div>
                     <p className="text-gray-500">Saved</p>
                     <p className="font-medium text-green-500">{reduction}%</p>

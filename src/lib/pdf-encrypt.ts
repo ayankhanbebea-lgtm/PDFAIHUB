@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
 import { PDFDocument } from 'pdf-lib';
+import { execSync, execFileSync } from 'child_process';
 
 // Lazy-import muhammara
 let muhammara: any = null;
@@ -119,16 +120,53 @@ export async function encryptPDF(
 }
 
 /**
- * Remove password protection from a PDF using pdf-lib (in-memory) and muhammara fallback.
+ * Automatically finds the path to the mutool.exe binary installed via winget or system path.
+ */
+function findMutoolPath(): string | null {
+  // 1. Check if mutool is available globally
+  try {
+    execSync('mutool --version', { stdio: 'ignore' });
+    return 'mutool';
+  } catch {}
+
+  // 2. Check local AppData WinGet packages folder
+  const localAppData = process.env.LOCALAPPDATA;
+  if (localAppData) {
+    const packagesDir = path.join(localAppData, 'Microsoft/WinGet/Packages');
+    if (fs.existsSync(packagesDir)) {
+      try {
+        const dirs = fs.readdirSync(packagesDir);
+        const mutoolDir = dirs.find(d => d.startsWith('ArtifexSoftware.mutool'));
+        if (mutoolDir) {
+          const binPath = path.join(packagesDir, mutoolDir, 'mupdf-1.23.0-windows/mutool.exe');
+          if (fs.existsSync(binPath)) {
+            return binPath;
+          }
+        }
+      } catch {}
+    }
+  }
+
+  // 3. Hardcoded fallback for default ayank user just in case env is different
+  const fallbackPath = 'C:/Users/ayank/AppData/Local/Microsoft/WinGet/Packages/ArtifexSoftware.mutool_Microsoft.Winget.Source_8wekyb3d8bbwe/mupdf-1.23.0-windows/mutool.exe';
+  if (fs.existsSync(fallbackPath)) {
+    return fallbackPath;
+  }
+
+  return null;
+}
+
+/**
+ * Remove password protection from a PDF.
+ * To satisfy strict fidelity requirements, we do a pure decryption:
+ * 1. Primary: Use native "mutool clean -p <password> -D -m" which removes security dicts
+ *    without deflating, rewriting, cleaning, or recompressing object streams.
+ * 2. Fallback: Use muhammara.recrypt with compress: false and matching original PDF version.
  */
 export async function decryptPDF(
   pdfBuffer: Buffer,
   password = ''
 ): Promise<Buffer> {
-  if (!muhammara) {
-    throw new Error('PDF Decryption engine (muhammara) is not available.');
-  }
-
   const tmpDir = os.tmpdir();
   const id = crypto.randomBytes(16).toString('hex');
   const tempInputPath = path.join(tmpDir, `input_${id}.pdf`);
@@ -136,12 +174,57 @@ export async function decryptPDF(
 
   try {
     fs.writeFileSync(tempInputPath, pdfBuffer);
-    muhammara.recrypt(tempInputPath, tempOutputPath, { password });
+
+    // Try mutool clean (pure decryption, no optimization) first
+    const mutoolBin = findMutoolPath();
+    if (mutoolBin) {
+      try {
+        // -p <password>: authenticate
+        // -D: save file without encryption
+        // -m: preserve metadata
+        execFileSync(mutoolBin, ['clean', '-p', password, '-D', '-m', tempInputPath, tempOutputPath], { stdio: 'ignore' });
+        
+        if (fs.existsSync(tempOutputPath) && fs.statSync(tempOutputPath).size > 0) {
+          const decryptedBuffer = fs.readFileSync(tempOutputPath);
+          return decryptedBuffer;
+        }
+      } catch (mutoolErr: any) {
+        console.warn('[pdf-encrypt] mutool decryption failed, falling back to muhammara:', mutoolErr.message);
+        // If password authentication failed, throw immediately
+        if (mutoolErr.message && (mutoolErr.message.includes('authenticate') || mutoolErr.message.includes('password'))) {
+          throw new Error('Failed to decrypt PDF. Verify the password is correct.');
+        }
+      }
+    }
+
+    // Fallback to muhammara.recrypt with strict no-compress and original version matching
+    if (!muhammara) {
+      throw new Error('PDF Decryption engine is not available.');
+    }
+
+    // Read PDF version from original header to keep it identical
+    let pdfVersion: number | undefined;
+    try {
+      const header = pdfBuffer.toString('utf8', 0, 9);
+      const match = header.match(/%PDF-1\.([0-7])/);
+      if (match) {
+        pdfVersion = 10 + parseInt(match[1], 10);
+      }
+    } catch (verErr) {
+      console.warn('[pdf-encrypt] Could not parse PDF version:', verErr);
+    }
+
+    const options: any = { password, compress: false };
+    if (pdfVersion && pdfVersion >= 10 && pdfVersion <= 17) {
+      options.version = pdfVersion;
+    }
+
+    muhammara.recrypt(tempInputPath, tempOutputPath, options);
     
     const decryptedBuffer = fs.readFileSync(tempOutputPath);
     return decryptedBuffer;
   } catch (err: any) {
-    console.error('[pdf-encrypt] muhammara decryption failed:', err.message);
+    console.error('[pdf-encrypt] Decryption failed:', err.message);
     throw new Error('Failed to decrypt PDF. Verify the password is correct.');
   } finally {
     try {

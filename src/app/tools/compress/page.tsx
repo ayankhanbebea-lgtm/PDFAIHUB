@@ -144,6 +144,8 @@ export default function CompressPage() {
           downloadName={`compressed-${files[0]?.name || 'file.pdf'}`}
           originalSize={originalSize}
           resultSize={resultSize}
+          resultLabel="Compressed"
+          showReduction={true}
           onReset={reset}
         />
 
