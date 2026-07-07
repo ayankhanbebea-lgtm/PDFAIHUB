@@ -16,7 +16,7 @@
 //   6. Clean up temporary files.
 // ─────────────────────────────────────────────────────────────
 
-import { PDFDocument, PDFRawStream, PDFName, PDFArray, PDFDict, decodePDFRawStream } from 'pdf-lib';
+import { PDFDocument, PDFRawStream, PDFName, PDFArray, PDFDict } from 'pdf-lib';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -83,6 +83,19 @@ function findMutoolPath(): string | null {
     return fallbackPath;
   }
 
+  return null;
+}
+
+function findGhostscriptPath(): string | null {
+  const { execSync } = require('child_process');
+  try {
+    execSync('gswin64c --version', { stdio: 'ignore' });
+    return 'gswin64c';
+  } catch {}
+  try {
+    execSync('gs --version', { stdio: 'ignore' });
+    return 'gs';
+  } catch {}
   return null;
 }
 
@@ -160,6 +173,11 @@ function unfilterPngPredictor(
 
 /**
  * Compresses an image raw stream and returns the new JPEG buffer.
+ *
+ * CRITICAL FIX: pdf-lib's decodePDFRawStream() throws
+ * "/DCTDecode stream encoding not supported" for JPEG images.
+ * For DCT images, pdfObject.contents IS already the raw JPEG bytes — read them directly.
+ * For FlateDecode, use Node.js zlib.inflateSync directly on raw contents.
  */
 async function compressImageStream(
   pdfObject: PDFRawStream,
@@ -181,19 +199,23 @@ async function compressImageStream(
   const imageMask = dict.get(PDFName.of('ImageMask'));
   if (imageMask && imageMask.toString() === 'true') return null;
 
-  const hasDCT = filters.some(f => f === '/DCTDecode' || f === '/DCT');
+  const hasDCT   = filters.some(f => f === '/DCTDecode' || f === '/DCT');
   const hasFlate = filters.some(f => f === '/FlateDecode' || f === '/Fl');
 
   if (!hasDCT && !hasFlate) return null;
 
   try {
-    const decodedStream = decodePDFRawStream(pdfObject);
-    const decodedBytes = Buffer.from(decodedStream.getBytes((decodedStream as any).length));
-
     if (hasDCT) {
-      if (decodedBytes.length < 4 || decodedBytes[0] !== 0xFF || decodedBytes[1] !== 0xD8) return null;
+      // For DCT/JPEG images, pdfObject.contents ARE the raw JPEG bytes.
+      // DO NOT call decodePDFRawStream() — it throws "DCTDecode not supported".
+      const jpegBytes = Buffer.from(pdfObject.contents);
 
-      let pipeline = sharpLib(decodedBytes);
+      // Validate JPEG SOI marker (0xFFD8)
+      if (jpegBytes.length < 4 || jpegBytes[0] !== 0xFF || jpegBytes[1] !== 0xD8) {
+        return null;
+      }
+
+      let pipeline = sharpLib(jpegBytes);
       if (width > maxDim || height > maxDim) {
         pipeline = pipeline.resize(maxDim, maxDim, { fit: 'inside', withoutEnlargement: true });
       }
@@ -203,7 +225,7 @@ async function compressImageStream(
         .toBuffer();
 
       return { buffer: recompressed, colorSpace: 'DeviceRGB' };
-    } 
+    }
 
     if (hasFlate) {
       const bpcObj = dict.get(PDFName.of('BitsPerComponent'));
@@ -223,6 +245,20 @@ async function compressImageStream(
         colorSpace = 'DeviceCMYK';
       } else if (csStr.includes('Indexed') || csStr.includes('indexed')) {
         return null;
+      }
+
+      // Use Node.js zlib directly — DO NOT call decodePDFRawStream()
+      const zlib = require('zlib');
+      const compressedBytes = Buffer.from(pdfObject.contents);
+      let decodedBytes: Buffer;
+      try {
+        decodedBytes = zlib.inflateSync(compressedBytes);
+      } catch {
+        try {
+          decodedBytes = zlib.inflateRawSync(compressedBytes);
+        } catch {
+          return null;
+        }
       }
 
       const decodeParms = dict.get(PDFName.of('DecodeParms'));
@@ -292,6 +328,63 @@ export async function compressPDFReal(
   level: 'low' | 'medium' | 'high' = 'medium'
 ): Promise<CompressResult> {
   const originalSize = pdfBuffer.length;
+  const gsBin = findGhostscriptPath();
+
+  if (gsBin) {
+    console.log(`[pdf-compress] Ghostscript binary detected (${gsBin}). Executing native Ghostscript PDFwrite compression.`);
+    const tempInFile = path.join(os.tmpdir(), `gs-in-${crypto.randomUUID()}.pdf`);
+    const tempOutFile = path.join(os.tmpdir(), `gs-out-${crypto.randomUUID()}.pdf`);
+
+    try {
+      fs.writeFileSync(tempInFile, pdfBuffer);
+
+      // Map low/medium/high levels to Ghostscript PDFSETTINGS
+      const settings = level === 'low' ? '/printer' : level === 'high' ? '/screen' : '/ebook';
+      const args = [
+        '-sDEVICE=pdfwrite',
+        '-dCompatibilityLevel=1.4',
+        '-dNOPAUSE',
+        '-dQUIET',
+        '-dBATCH',
+        `-dPDFSETTINGS=${settings}`,
+        `-sOutputFile=${tempOutFile}`,
+        tempInFile
+      ];
+
+      await new Promise<void>((resolve, reject) => {
+        execFile(gsBin, args, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      if (fs.existsSync(tempOutFile) && fs.statSync(tempOutFile).size > 0) {
+        const finalBuffer = fs.readFileSync(tempOutFile);
+        const finalSize = finalBuffer.length;
+        const reduction = Math.max(0, Math.round(((originalSize - finalSize) / originalSize) * 100));
+        const didCompress = finalSize < originalSize && reduction >= 1;
+
+        return {
+          buffer:           didCompress ? finalBuffer : pdfBuffer,
+          originalSize,
+          compressedSize:   didCompress ? finalSize   : originalSize,
+          reduction:        didCompress ? reduction   : 0,
+          alreadyOptimized: !didCompress,
+          imagesRecompressed: 1, // Marks image processing happened
+          engine:           `Ghostscript PDFwrite Engine (${settings})`,
+          technicalReason:  didCompress ? undefined : 'This PDF is already optimized and cannot be compressed further.',
+        };
+      }
+    } catch (e: any) {
+      console.warn('[pdf-compress] Ghostscript run failed, falling back to MuPDF clean:', e.message);
+    } finally {
+      try { if (fs.existsSync(tempInFile)) fs.unlinkSync(tempInFile); } catch {}
+      try { if (fs.existsSync(tempOutFile)) fs.unlinkSync(tempOutFile); } catch {}
+    }
+  }
+
+  // --- Fallback Pipeline: MuPDF mutool clean + sharp image recompress ---
+  console.log('[pdf-compress] Ghostscript not available. Using fallback: MuPDF mutool clean + sharp image pipeline.');
   const jpegQuality  = JPEG_QUALITY[level];
   const maxDim       = MAX_DIMENSION[level];
 

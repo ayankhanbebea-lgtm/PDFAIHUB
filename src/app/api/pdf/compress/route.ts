@@ -106,16 +106,17 @@ export async function POST(request: NextRequest) {
     return new Response(new Uint8Array(result.buffer), {
       status: 200,
       headers: {
-        'Content-Type':          'application/pdf',
-        'Content-Disposition':   `attachment; filename="${outputName}"`,
-        'Content-Length':        String(result.compressedSize),
-        'X-Original-Size':       String(result.originalSize),
-        'X-Compressed-Size':     String(result.compressedSize),
-        'X-Reduction-Percent':   String(result.reduction),
-        'X-Images-Recompressed': String(result.imagesRecompressed),
-        'X-Already-Optimized':   String(result.alreadyOptimized),
-        'X-Compression-Engine':  result.engine,
-        'X-Compression-Message': message,
+        'Content-Type':                  'application/pdf',
+        'Content-Disposition':           `attachment; filename="${outputName}"`,
+        'Content-Length':                String(result.compressedSize),
+        'X-Original-Size':               String(result.originalSize),
+        'X-Compressed-Size':             String(result.compressedSize),
+        'X-Reduction-Percent':           String(result.reduction),
+        'X-Images-Recompressed':         String(result.imagesRecompressed),
+        'X-Already-Optimized':           String(result.alreadyOptimized),
+        'X-Compression-Engine':          result.engine,
+        'X-Compression-Message':         message,
+        'Access-Control-Expose-Headers': 'X-Original-Size, X-Compressed-Size, X-Reduction-Percent, X-Images-Recompressed, X-Already-Optimized, X-Compression-Engine, X-Compression-Message',
       },
     });
   } catch (error: any) {
