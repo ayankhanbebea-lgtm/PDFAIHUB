@@ -1,19 +1,15 @@
-// src/lib/pdf-encrypt.ts
-// ─────────────────────────────────────────────────────────────
-// Real PDF Encryption and Decryption using muhammara.Recipe.
-// Compliant with standard PDF encryption readable by Adobe Acrobat,
-// Chrome, Firefox, Safari, Edge.
-// ─────────────────────────────────────────────────────────────
-
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
+import { PDFDocument } from 'pdf-lib';
 
 // Lazy-import muhammara
+let muhammara: any = null;
 let Recipe: any = null;
 try {
-  Recipe = require('muhammara').Recipe;
+  muhammara = require('muhammara');
+  Recipe = muhammara.Recipe;
 } catch (err) {
   console.warn('[pdf-encrypt] muhammara not available');
 }
@@ -123,14 +119,14 @@ export async function encryptPDF(
 }
 
 /**
- * Remove password protection from a PDF using muhammara.Recipe.
+ * Remove password protection from a PDF using pdf-lib (in-memory) and muhammara fallback.
  */
 export async function decryptPDF(
   pdfBuffer: Buffer,
   password = ''
 ): Promise<Buffer> {
-  if (!Recipe) {
-    throw new Error('muhammara library is not available');
+  if (!muhammara) {
+    throw new Error('PDF Decryption engine (muhammara) is not available.');
   }
 
   const tmpDir = os.tmpdir();
@@ -140,20 +136,13 @@ export async function decryptPDF(
 
   try {
     fs.writeFileSync(tempInputPath, pdfBuffer);
-
-    // Read the encrypted PDF with password and write to a new unencrypted PDF
-    const pdfDoc = new Recipe(tempInputPath, tempOutputPath, { password });
+    muhammara.recrypt(tempInputPath, tempOutputPath, { password });
     
-    // In hummus-recipe/muhammara, saving/ending the recipe without calling .encrypt()
-    // automatically strips encryption from the output PDF
-    pdfDoc.endPDF();
-
     const decryptedBuffer = fs.readFileSync(tempOutputPath);
     return decryptedBuffer;
-
   } catch (err: any) {
-    console.error('[pdf-encrypt] Decryption failed:', err);
-    throw new Error(`Failed to decrypt PDF: ${err.message}`);
+    console.error('[pdf-encrypt] muhammara decryption failed:', err.message);
+    throw new Error('Failed to decrypt PDF. Verify the password is correct.');
   } finally {
     try {
       if (fs.existsSync(tempInputPath)) fs.unlinkSync(tempInputPath);

@@ -7,6 +7,7 @@ import { chatWithPDF } from '@/lib/ai';
 import { extractTextFromPDF } from '@/lib/pdf-ai';
 import { checkUsage, incrementUsage, logUsage } from '@/lib/rate-limit';
 import { uploadToCloudinary } from '@/lib/cloudinary';
+import { priorityScheduler } from '@/lib/priority-queue';
 import prisma from '@/lib/prisma';
 
 export const runtime = 'nodejs';
@@ -32,6 +33,9 @@ export async function POST(request: NextRequest) {
     const question = formData.get('question') as string;
     const sessionId = formData.get('sessionId') as string | null;
     const provider = (formData.get('provider') as 'openai' | 'gemini' | 'groq') || 'groq';
+    
+    // Check for pro status (assuming standard user object structure)
+    const isPro = (session.user as any)?.plan === 'PRO';
 
     console.log(`[chat] Request — question: ${question?.slice(0,50)}, sessionId: ${sessionId}, provider: ${provider}, hasFile: ${!!file}`);
 
@@ -48,7 +52,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Valid PDF required' }, { status: 400 });
       }
       const buffer = Buffer.from(await file.arrayBuffer());
-      pdfContent = await extractTextFromPDF(buffer);
+      
+      pdfContent = await priorityScheduler.enqueue(async () => {
+        return extractTextFromPDF(buffer);
+      }, isPro);
+
       console.log(`[chat] Extracted PDF text: ${pdfContent?.length ?? 0} chars`);
       if (!pdfContent || pdfContent.trim().length < 50) {
         return NextResponse.json({ error: 'Could not extract text from PDF' }, { status: 400 });
@@ -118,7 +126,9 @@ export async function POST(request: NextRequest) {
         }))?.messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })) || []
       : [];
 
-    const answer = await chatWithPDF(question, pdfContent, history, provider);
+    const answer = await priorityScheduler.enqueue(async () => {
+      return chatWithPDF(question, pdfContent, history, provider);
+    }, isPro);
 
     await prisma.chatMessage.createMany({
       data: [

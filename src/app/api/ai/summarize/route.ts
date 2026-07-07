@@ -6,6 +6,7 @@ import { generateSummary } from '@/lib/ai';
 import { extractTextFromPDF } from '@/lib/pdf-ai';
 import { checkUsage, incrementUsage, logUsage } from '@/lib/rate-limit';
 import { uploadToCloudinary } from '@/lib/cloudinary';
+import { priorityScheduler } from '@/lib/priority-queue';
 import prisma from '@/lib/prisma';
 
 export const runtime = 'nodejs';
@@ -14,13 +15,13 @@ export const maxDuration = 120;
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Sign in required to use AI features' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const usage = await checkUsage(session.user.id, 'ai');
   if (!usage.allowed) {
     return NextResponse.json(
-      { error: "You've used all 10 free AI requests. Upgrade to Pro for unlimited AI features, or wait until your 24-hour limit resets.", upgrade: true },
+      { error: "You've reached your free daily limit for AI operations. Upgrade to Pro for unlimited usage.", upgrade: true },
       { status: 429 }
     );
   }
@@ -39,8 +40,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'PDF must be under 20MB' }, { status: 400 });
     }
 
+    const isPro = session.user.plan === 'PRO';
     const buffer = Buffer.from(await file.arrayBuffer());
-    const text = await extractTextFromPDF(buffer);
+    
+    // Wrap text extraction in priority scheduler
+    const text = await priorityScheduler.enqueue(async () => {
+      return extractTextFromPDF(buffer);
+    }, isPro);
+    
     console.log(`[summarize] extracted: ${text?.length ?? 0} chars`);
 
     if (!text || text.trim().length < 100) {
@@ -50,7 +57,11 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const summary = await generateSummary(text, provider);
+    // Wrap AI model call in priority scheduler
+    const summary = await priorityScheduler.enqueue(async () => {
+      return generateSummary(text, provider);
+    }, isPro);
+    
     console.log(`[summarize] summary generated — shortSummary: ${summary?.shortSummary?.length ?? 0} chars`);
 
     // Cloudinary — optional

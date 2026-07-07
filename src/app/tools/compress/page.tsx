@@ -66,7 +66,7 @@ export default function CompressPage() {
       setOriginalSize(originalSz);
 
       if (alreadyOptimized) {
-        setMessage('PDF is already optimized — no significant size reduction possible.');
+        setMessage('This PDF is already optimized and cannot be compressed further.');
         toast('This PDF is already well-optimized. Downloaded a cleaned copy.', { icon: 'ℹ️', duration: 5000 });
       } else {
         const detail = imagesRecompressed > 0 ? ` (${imagesRecompressed} image${imagesRecompressed > 1 ? 's' : ''} recompressed)` : '';

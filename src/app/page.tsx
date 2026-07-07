@@ -6,16 +6,22 @@ import { Navbar } from '@/components/layout/navbar';
 import { Footer } from '@/components/layout/footer';
 import { PricingSection } from '@/components/pricing-section';
 import {
-  ArrowRight, FileText, Sparkles, Brain, BookOpen, MessageSquare
-} from 'lucide-react';
-
-const pdfTools = [
+  ArrowRight, Sparkles, Brain, BookOpen, MessageSquare
+} from 'lucide-react';const freePdfTools = [
   { icon: '🔗', name: 'PDF Merge', desc: 'Combine multiple PDFs into one file', href: '/tools/merge', color: 'from-blue-500 to-indigo-500' },
   { icon: '✂️', name: 'PDF Split', desc: 'Extract specific pages or split by range', href: '/tools/split', color: 'from-purple-500 to-pink-500' },
   { icon: '🗜️', name: 'PDF Compress', desc: 'Reduce file size without quality loss', href: '/tools/compress', color: 'from-green-500 to-emerald-500' },
   { icon: '📝', name: 'PDF to Word', desc: 'Convert PDF to editable DOCX format', href: '/tools/pdf-to-word', color: 'from-orange-500 to-amber-500' },
   { icon: '🖼️', name: 'Image to PDF', desc: 'Convert JPG, PNG, WEBP to PDF', href: '/tools/image-to-pdf', color: 'from-red-500 to-rose-500' },
-  { icon: '🔒', name: 'PDF Protect', desc: 'Add or remove password protection', href: '/tools/protect', color: 'from-slate-500 to-gray-600' },
+  { icon: '🔒', name: 'PDF Protect', desc: 'Add password security to your document', href: '/tools/protect', color: 'from-slate-500 to-gray-600' },
+];
+
+const proPdfTools = [
+  { icon: '🔓', name: 'Unlock PDF', desc: 'Remove password security and encryption', href: '/tools/unlock', color: 'from-cyan-500 to-blue-500', isPro: true },
+  { icon: '📝', name: 'Watermark PDF', desc: 'Add text or image watermark overlays to pages', href: '/tools/watermark', color: 'from-amber-500 to-red-500', isPro: true },
+  { icon: '🔄', name: 'Rotate PDF', desc: 'Rotate specific or all PDF pages easily', href: '/tools/rotate', color: 'from-pink-500 to-indigo-500', isPro: true },
+  { icon: '📊', name: 'Organize PDF', desc: 'Reorder, duplicate, rotate, or delete pages', href: '/tools/organize', color: 'from-violet-500 to-purple-500', isPro: true },
+  { icon: '🔍', name: 'OCR Text Extractor', desc: 'Extract plain text from scanned PDFs & images', href: '/tools/ocr', color: 'from-emerald-500 to-teal-500', isPro: true },
 ];
 
 const aiFeatures = [
@@ -33,29 +39,37 @@ export default function HomePage() {
       {/* Hero */}
       <section className="relative overflow-hidden bg-hero-gradient pt-24 pb-20 lg:pt-32 lg:pb-28 border-b border-border">
         {/* Background glow effects */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute top-1/3 left-1/3 w-[300px] h-[300px] bg-secondary/10 rounded-full blur-[100px] pointer-events-none" />
 
-        <div className="section-container relative z-10">
-          <div className="text-center max-w-4xl mx-auto">
+        <div className="section-container relative">
+          <div className="max-w-3xl mx-auto text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary mb-6 border border-primary/20">
+                <Sparkles className="w-3.5 h-3.5" /> AI-Powered Study Suite
+              </span>
+            </motion.div>
+
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
-              className="text-4xl sm:text-5xl lg:text-7xl font-bold text-foreground mb-6 leading-tight"
+              className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-6 leading-none"
             >
-              The Smartest PDF
-              <br />
-              Toolkit on the Web
+              Master Your Studies with <span className="gradient-text">AI & PDF Tools</span>
             </motion.h1>
 
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto"
+              className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed"
             >
-              Merge, compress, convert PDFs — then supercharge your workflow with AI summaries,
-              document chat, flashcards, and auto-generated quizzes. Built for students & professionals.
+              Convert, merge, split, and compress PDFs. Chat with your documents, generate revision notes, flashcards, and interactive practice tests instantly.
             </motion.p>
 
             <motion.div
@@ -64,56 +78,89 @@ export default function HomePage() {
               transition={{ duration: 0.5, delay: 0.3 }}
               className="flex flex-col sm:flex-row gap-4 justify-center"
             >
-              <Link href="/auth/register" className="btn-brand text-base px-8 py-3.5 flex items-center gap-2 justify-center">
-                Start for Free
-                <ArrowRight className="w-4 h-4" />
+              <Link href="/pricing" className="btn-brand text-base px-8 py-3.5 flex items-center gap-2 justify-center shadow-lg hover:shadow-xl transition-all duration-300">
+                Get Started Free <ArrowRight className="w-4 h-4" />
               </Link>
               <Link href="/tools/merge" className="btn-ghost text-base px-8 py-3.5 flex items-center gap-2 justify-center">
-                <FileText className="w-4 h-4" />
-                Try PDF Tools
+                Explore PDF Tools
               </Link>
             </motion.div>
-
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="mt-4 text-sm text-muted-foreground"
-            >
-              No credit card required • 10 AI summaries free daily • 50 PDF operations free
-            </motion.p>
           </div>
         </div>
       </section>
 
-      {/* PDF Tools Grid */}
+      {/* Free PDF Tools */}
       <section className="py-20 bg-secondary/30">
         <div className="section-container">
           <div className="text-center mb-12">
             <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
-              All the PDF Tools You Need
+              Free PDF Tools
             </h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              Professional-grade PDF processing — fast, secure, and free to use.
+              Professional-grade PDF processing — fast, secure, and completely free to use.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {pdfTools.map((tool, i) => (
+            {freePdfTools.map((tool, i) => (
               <motion.div
                 key={tool.href}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
+                transition={{ delay: i * 0.05 }}
                 viewport={{ once: true }}
               >
                 <Link href={tool.href} className="feature-card block group">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform duration-200">
-                    {tool.icon}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform duration-200">
+                      {tool.icon}
+                    </div>
                   </div>
                   <h3 className="text-lg font-semibold text-foreground mb-2">{tool.name}</h3>
                   <p className="text-sm text-muted-foreground">{tool.desc}</p>
                   <div className="mt-4 flex items-center gap-1 text-primary text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                    Try now <ArrowRight className="w-3.5 h-3.5" />
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pro PDF Tools */}
+      <section className="py-20 bg-gradient-to-b from-secondary/15 to-transparent border-t border-border/40">
+        <div className="section-container">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4 flex items-center justify-center gap-2">
+              ⭐ Pro PDF Tools
+            </h2>
+            <p className="text-muted-foreground max-w-xl mx-auto font-medium">
+              Unlock advanced document manipulation with our premium Pro-only toolset.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {proPdfTools.map((tool, i) => (
+              <motion.div
+                key={tool.href}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                viewport={{ once: true }}
+              >
+                <Link href={tool.href} className="feature-card block group border-amber-500/20 bg-amber-500/5 hover:border-amber-500/40 transition-colors">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform duration-200">
+                      {tool.icon}
+                    </div>
+                    <span className="text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold">
+                      PRO ONLY
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">{tool.name}</h3>
+                  <p className="text-sm text-muted-foreground">{tool.desc}</p>
+                  <div className="mt-4 flex items-center gap-1 text-amber-500 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
                     Try now <ArrowRight className="w-3.5 h-3.5" />
                   </div>
                 </Link>

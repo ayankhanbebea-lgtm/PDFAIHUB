@@ -11,6 +11,7 @@ import { authOptions } from '@/lib/auth';
 import { checkUsage, incrementUsage, logUsage } from '@/lib/rate-limit';
 import { getGuestIdentifier, checkGuestLimit, incrementGuestUsage } from '@/lib/guest-limit';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
+import { priorityScheduler } from '@/lib/priority-queue';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -171,13 +172,18 @@ export async function POST(request: NextRequest) {
     const baseTitle = file.name.replace(/\.pdf$/i, '');
     const outputName = baseTitle + '.docx';
 
-    // Attempt text extraction — never throws, returns '' for scanned PDFs
-    const text = await safeExtractText(buffer);
-    const hasText = text.trim().length >= 10;
+    const isPro = session?.user?.plan === 'PRO';
 
-    // Build DOCX: rich content for text PDFs, informative placeholder for scanned ones
-    const doc = hasText ? buildDocxFromText(text, baseTitle) : buildScannedFallbackDocx(baseTitle);
-    const docxBuffer = await Packer.toBuffer(doc);
+    const { docxBuffer, hasText } = await priorityScheduler.enqueue(async () => {
+      // Attempt text extraction — never throws, returns '' for scanned PDFs
+      const text = await safeExtractText(buffer);
+      const hasText = text.trim().length >= 10;
+
+      // Build DOCX: rich content for text PDFs, informative placeholder for scanned ones
+      const doc = hasText ? buildDocxFromText(text, baseTitle) : buildScannedFallbackDocx(baseTitle);
+      const docxBuffer = await Packer.toBuffer(doc);
+      return { docxBuffer, hasText };
+    }, isPro);
 
     if (session?.user?.id) {
       await incrementUsage(session.user.id, 'pdf');

@@ -12,6 +12,32 @@ export interface UsageStatus {
   resetInMs: number;
 }
 
+async function verifyActiveProSubscription(userId: string, currentPlan: string): Promise<string> {
+  if (currentPlan !== 'PRO') return currentPlan;
+
+  const activeSub = await prisma.subscription.findFirst({
+    where: { userId, status: 'ACTIVE' },
+    orderBy: { currentPeriodEnd: 'desc' },
+  });
+
+  const now = new Date();
+  if (!activeSub || activeSub.currentPeriodEnd < now) {
+    // Downgrade user to FREE in database
+    await prisma.user.update({
+      where: { id: userId },
+      data: { plan: 'FREE' },
+    });
+    if (activeSub) {
+      await prisma.subscription.update({
+        where: { id: activeSub.id },
+        data: { status: 'EXPIRED' },
+      });
+    }
+    return 'FREE';
+  }
+  return 'PRO';
+}
+
 // Check if the user is allowed to perform the operation (read-only)
 export async function checkUsage(
   userId: string,
@@ -29,8 +55,10 @@ export async function checkUsage(
 
   if (!user) throw new Error('User not found');
 
+  const resolvedPlan = await verifyActiveProSubscription(userId, user.plan);
+
   // PRO users have unlimited usage
-  if (user.plan === 'PRO') {
+  if (resolvedPlan === 'PRO') {
     return { allowed: true, remaining: Infinity, limit: Infinity, resetInMs: 0 };
   }
 
@@ -80,6 +108,8 @@ export async function incrementUsage(
 
   if (!user) throw new Error('User not found');
 
+  const resolvedPlan = await verifyActiveProSubscription(userId, user.plan);
+
   const now = new Date();
   const lastResetTime = new Date(user.lastReset).getTime();
   const timeElapsed = now.getTime() - lastResetTime;
@@ -118,7 +148,7 @@ export async function incrementUsage(
     },
   });
 
-  const isPro = user.plan === 'PRO';
+  const isPro = resolvedPlan === 'PRO';
   const limit = type === 'ai' ? FREE_AI_LIMIT : FREE_PDF_LIMIT;
   const currentUsed = type === 'ai' ? newAiUsed : newPdfUsed;
   const remaining = isPro ? Infinity : Math.max(0, limit - currentUsed);

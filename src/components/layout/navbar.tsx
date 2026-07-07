@@ -19,6 +19,14 @@ const pdfTools = [
   { name: 'PDF Protect', href: '/tools/protect', icon: '🔒', free: true },
 ];
 
+const proPdfTools = [
+  { name: 'Unlock PDF', href: '/tools/unlock', icon: '🔓', isPro: true },
+  { name: 'Watermark PDF', href: '/tools/watermark', icon: '📝', isPro: true },
+  { name: 'Rotate PDF', href: '/tools/rotate', icon: '🔄', isPro: true },
+  { name: 'Organize PDF', href: '/tools/organize', icon: '📊', isPro: true },
+  { name: 'OCR Extract', href: '/tools/ocr', icon: '🔍', isPro: true },
+];
+
 const aiTools = [
   { name: 'AI Summarizer', href: '/ai/summarize', icon: '🤖' },
   { name: 'AI PDF Chat', href: '/ai/chat', icon: '💬' },
@@ -32,6 +40,7 @@ export function Navbar() {
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [proToolsOpen, setProToolsOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -93,6 +102,42 @@ export function Navbar() {
                         <span>{tool.icon}</span>
                         <span className="flex-1">{tool.name}</span>
                         <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-semibold">Free</span>
+                      </Link>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Pro PDF Tools */}
+            <div
+              className="relative"
+              onMouseEnter={() => setProToolsOpen(true)}
+              onMouseLeave={() => setProToolsOpen(false)}
+            >
+              <button className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                Pro PDF Tools
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${proToolsOpen ? 'rotate-180' : ''}`} />
+              </button>
+              <AnimatePresence>
+                {proToolsOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 6 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-full left-0 mt-1 w-64 glass rounded-2xl p-2 shadow-xl border border-border"
+                  >
+                    {proPdfTools.map((tool) => (
+                      <Link
+                        key={tool.href}
+                        href={tool.href}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                      >
+                        <span>{tool.icon}</span>
+                        <span className="flex-1">{tool.name}</span>
+                        <span className="text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold">Pro</span>
                       </Link>
                     ))}
                   </motion.div>
@@ -282,7 +327,23 @@ export function Navbar() {
                   onClick={closeMobile}
                 >
                   <span>{tool.icon}</span>
-                  {tool.name}
+                  <span className="flex-1">{tool.name}</span>
+                </Link>
+              ))}
+
+              <p className="text-xs font-semibold text-muted-foreground px-3 py-1 uppercase tracking-wider mt-3">
+                ⭐ Pro PDF Tools
+              </p>
+              {proPdfTools.map((tool) => (
+                <Link
+                  key={tool.href}
+                  href={tool.href}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors font-medium text-amber-600 dark:text-amber-500"
+                  onClick={closeMobile}
+                >
+                  <span>{tool.icon}</span>
+                  <span className="flex-1">{tool.name}</span>
+                  <span className="text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-bold">Pro</span>
                 </Link>
               ))}
 

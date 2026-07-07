@@ -2,3 +2,10 @@
 [ 05/07/2026 12:12:26 ] UnicodeString::FromUTF16BE, fault string - high surrogat encountered without a low surrogate
 [ 05/07/2026 12:12:26 ] UnicodeString::FromUTF16BE, fault string - high surrogat encountered without a low surrogate
 [ 05/07/2026 12:12:26 ] UnicodeString::FromUTF16BE, fault string - high surrogat encountered without a low surrogate
+[ 06/07/2026 13:09:47 ] PDFDocumentHandler::StartCopyingContext, Cant decrypt document. make sure to provide appropriate password for this document in order to copy from it
+[ 06/07/2026 13:47:05 ] PDFDocumentHandler::StartCopyingContext, Cant decrypt document. make sure to provide appropriate password for this document in order to copy from it
+[ 06/07/2026 13:47:58 ] PDFDocumentHandler::StartCopyingContext, Cant decrypt document. make sure to provide appropriate password for this document in order to copy from it
+[ 06/07/2026 13:57:10 ] PDFDocumentHandler::StartCopyingContext, Cant decrypt document. make sure to provide appropriate password for this document in order to copy from it
+[ 06/07/2026 14:00:37 ] PDFDocumentHandler::StartCopyingContext, Cant decrypt document. make sure to provide appropriate password for this document in order to copy from it
+[ 06/07/2026 19:29:17 ] PDFDocumentHandler::StartCopyingContext, Cant decrypt document. make sure to provide appropriate password for this document in order to copy from it
+[ 07/07/2026 12:34:52 ] PDFDocumentHandler::StartCopyingContext, Cant decrypt document. make sure to provide appropriate password for this document in order to copy from it

@@ -69,7 +69,7 @@ export function ToolLayout({
   }, [usage]);
 
   const showAuthWall = requiresAuth && !isLoggedIn && !isLoading;
-  const showProWall = isPro && !isProUser && !isLoading && isLoggedIn;
+  const showProWall = isPro && !isProUser && !isLoading;
 
   // Usage limits check
   const isLimitReached = 
@@ -104,11 +104,16 @@ export function ToolLayout({
                     </span>
                   )}
                   {isPro && (
-                    <span className="flex items-center gap-1 text-xs bg-primary text-primary-foreground px-2.5 py-1 rounded-full font-semibold">
-                      <Lock className="w-3 h-3" /> Pro
-                    </span>
+                    <>
+                      <span className="flex items-center gap-1 text-xs bg-amber-500/10 text-amber-500 border border-amber-500/30 px-2.5 py-1 rounded-full font-semibold">
+                        <Sparkles className="w-3 h-3 text-amber-500" /> ✨ Pro Feature
+                      </span>
+                      <span className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-semibold">
+                        Unlimited for Pro Members
+                      </span>
+                    </>
                   )}
-                  {!requiresAuth && !isAI && (
+                  {!requiresAuth && !isAI && !isPro && (
                     <span className="text-xs bg-primary/15 text-primary border border-primary/25 px-2.5 py-1 rounded-full font-semibold">
                       Free Daily Limit: 50 Ops
                     </span>
@@ -155,12 +160,12 @@ export function ToolLayout({
               animate={{ opacity: 1, y: 0 }}
               className="max-w-md mx-auto text-center py-16"
             >
-              <div className="w-20 h-20 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-6">
-                <Lock className="w-10 h-10 text-primary" />
+              <div className="w-20 h-20 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-6">
+                <Lock className="w-10 h-10 text-amber-500" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Pro Feature</h2>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">⭐ Pro Feature</h2>
               <p className="text-gray-600 dark:text-gray-400 mb-8">
-                Upgrade to Pro for unlimited access to all AI features.
+                {isPro ? 'Upgrade to Pro for unlimited access to all premium PDF tools.' : 'Upgrade to Pro for unlimited access to all AI features.'}
               </p>
               <Link href="/pricing" className="btn-brand px-8 py-3">Upgrade to Pro</Link>
             </motion.div>

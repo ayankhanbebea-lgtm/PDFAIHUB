@@ -18,6 +18,11 @@ const quickActions = [
   { name: 'Merge PDFs', href: '/tools/merge', icon: '🔗', category: 'pdf' },
   { name: 'Compress', href: '/tools/compress', icon: '🗜️', category: 'pdf' },
   { name: 'Split PDF', href: '/tools/split', icon: '✂️', category: 'pdf' },
+  { name: 'Unlock PDF', href: '/tools/unlock', icon: '🔓', category: 'pdf', isPro: true },
+  { name: 'Watermark', href: '/tools/watermark', icon: '📝', category: 'pdf', isPro: true },
+  { name: 'Rotate PDF', href: '/tools/rotate', icon: '🔄', category: 'pdf', isPro: true },
+  { name: 'Organize', href: '/tools/organize', icon: '📊', category: 'pdf', isPro: true },
+  { name: 'OCR Extract', href: '/tools/ocr', icon: '🔍', category: 'pdf', isPro: true },
   { name: 'AI Summary', href: '/ai/summarize', icon: '🤖', category: 'ai' },
   { name: 'AI Chat', href: '/ai/chat', icon: '💬', category: 'ai' },
   { name: 'Flashcards', href: '/ai/flashcards', icon: '🃏', category: 'ai' },
@@ -28,12 +33,16 @@ const toolLabels: Record<string, string> = {
   'pdf-to-word': 'PDF to Word', 'image-to-pdf': 'Image to PDF',
   protect: 'PDF Protect', summarize: 'AI Summary',
   chat: 'AI Chat', flashcards: 'Flashcards', quiz: 'Quiz',
+  unlock: 'PDF Unlock', watermark: 'PDF Watermark', rotate: 'PDF Rotate',
+  organize: 'PDF Organize', ocr: 'OCR Extract',
 };
 
 const toolEmoji: Record<string, string> = {
   merge: '🔗', compress: '🗜️', split: '✂️', 'pdf-to-word': '📝',
   'image-to-pdf': '🖼️', protect: '🔒', summarize: '🤖',
   chat: '💬', flashcards: '🃏', quiz: '❓',
+  unlock: '🔓', watermark: '📝', rotate: '🔄',
+  organize: '📊', ocr: '🔍',
 };
 
 export default function DashboardPage() {
@@ -236,8 +245,10 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {quickActions.map((action, i) => {
                 // Check if this action is locked
-                const isLocked = !isPro && usage && (
-                  action.category === 'ai' ? usage.aiRemaining <= 0 : usage.pdfRemaining <= 0
+                const isLocked = !isPro && (
+                  (action as any).isPro || (usage && (
+                    action.category === 'ai' ? usage.aiRemaining <= 0 : usage.pdfRemaining <= 0
+                  ))
                 );
 
                 return (

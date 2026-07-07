@@ -221,7 +221,7 @@ export async function extractTextFromPDF(pdfBuffer: Buffer): Promise<string> {
 }
 
 // ─── OCR using Tesseract.js (for scanned/image PDFs) ─────────────────────────
-async function extractWithOCR(pdfBuffer: Buffer): Promise<string> {
+export async function extractWithOCR(pdfBuffer: Buffer): Promise<string> {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { createWorker } = require('tesseract.js');
   console.log('[pdf-ai] OCR: initializing Tesseract worker...');

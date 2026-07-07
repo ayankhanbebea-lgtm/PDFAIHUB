@@ -16,8 +16,7 @@
 //   6. Clean up temporary files.
 // ─────────────────────────────────────────────────────────────
 
-import { PDFDocument, PDFRawStream, PDFName, PDFArray, PDFDict } from 'pdf-lib';
-import * as zlib from 'zlib';
+import { PDFDocument, PDFRawStream, PDFName, PDFArray, PDFDict, decodePDFRawStream } from 'pdf-lib';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -182,15 +181,19 @@ async function compressImageStream(
   const imageMask = dict.get(PDFName.of('ImageMask'));
   if (imageMask && imageMask.toString() === 'true') return null;
 
-  const isDCT = filters.length === 1 && filters[0] === '/DCTDecode';
-  const isFlate = filters.length === 1 && filters[0] === '/FlateDecode';
+  const hasDCT = filters.some(f => f === '/DCTDecode' || f === '/DCT');
+  const hasFlate = filters.some(f => f === '/FlateDecode' || f === '/Fl');
+
+  if (!hasDCT && !hasFlate) return null;
 
   try {
-    if (isDCT) {
-      const jpegBytes = Buffer.from(pdfObject.contents);
-      if (jpegBytes.length < 4 || jpegBytes[0] !== 0xFF || jpegBytes[1] !== 0xD8) return null;
+    const decodedStream = decodePDFRawStream(pdfObject);
+    const decodedBytes = Buffer.from(decodedStream.getBytes((decodedStream as any).length));
 
-      let pipeline = sharpLib(jpegBytes);
+    if (hasDCT) {
+      if (decodedBytes.length < 4 || decodedBytes[0] !== 0xFF || decodedBytes[1] !== 0xD8) return null;
+
+      let pipeline = sharpLib(decodedBytes);
       if (width > maxDim || height > maxDim) {
         pipeline = pipeline.resize(maxDim, maxDim, { fit: 'inside', withoutEnlargement: true });
       }
@@ -202,7 +205,7 @@ async function compressImageStream(
       return { buffer: recompressed, colorSpace: 'DeviceRGB' };
     } 
 
-    if (isFlate) {
+    if (hasFlate) {
       const bpcObj = dict.get(PDFName.of('BitsPerComponent'));
       const bpc = bpcObj ? parseInt(bpcObj.toString(), 10) : 8;
       if (bpc !== 8) return null;
@@ -222,13 +225,6 @@ async function compressImageStream(
         return null;
       }
 
-      let decompressed: Buffer;
-      try {
-        decompressed = zlib.inflateSync(Buffer.from(pdfObject.contents));
-      } catch {
-        return null;
-      }
-
       const decodeParms = dict.get(PDFName.of('DecodeParms'));
       let predictor = 1;
       if (decodeParms instanceof PDFDict) {
@@ -236,9 +232,9 @@ async function compressImageStream(
         if (predObj) predictor = parseInt(predObj.toString(), 10);
       }
 
-      let rawPixelData = decompressed;
+      let rawPixelData = decodedBytes;
       if (predictor > 1) {
-        rawPixelData = unfilterPngPredictor(decompressed, width, height, channels);
+        rawPixelData = unfilterPngPredictor(decodedBytes, width, height, channels) as any;
       }
 
       let pipeline = sharpLib(rawPixelData, {
@@ -400,7 +396,7 @@ export async function compressPDFReal(
 
   let technicalReason: string | undefined = undefined;
   if (!didCompress) {
-    technicalReason = 'No large images were found in the PDF, or all images and fonts are already compressed and optimized to their maximum capacity.';
+    technicalReason = 'This PDF is already optimized and cannot be compressed further.';
   }
 
   return {
