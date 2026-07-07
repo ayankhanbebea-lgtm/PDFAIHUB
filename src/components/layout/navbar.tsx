@@ -17,6 +17,15 @@ const pdfTools = [
   { name: 'PDF to Word', href: '/tools/pdf-to-word', icon: '📝', free: true },
   { name: 'Image to PDF', href: '/tools/image-to-pdf', icon: '🖼️', free: true },
   { name: 'PDF Protect', href: '/tools/protect', icon: '🔒', free: true },
+  { name: 'JPG to PDF', href: '/tools/jpg-to-pdf', icon: '🖼️', free: true },
+  { name: 'Word to PDF', href: '/tools/word-to-pdf', icon: '📝', free: true },
+  { name: 'PowerPoint to PDF', href: '/tools/powerpoint-to-pdf', icon: '📊', free: true },
+  { name: 'Excel to PDF', href: '/tools/excel-to-pdf', icon: '📈', free: true },
+  { name: 'HTML to PDF', href: '/tools/html-to-pdf', icon: '🌐', free: true },
+  { name: 'PDF to JPG', href: '/tools/pdf-to-jpg', icon: '🖼️', free: true },
+  { name: 'PDF to PowerPoint', href: '/tools/pdf-to-powerpoint', icon: '📊', free: true },
+  { name: 'PDF to Excel', href: '/tools/pdf-to-excel', icon: '📈', free: true },
+  { name: 'PDF to PDF/A', href: '/tools/pdf-to-pdfa', icon: '🏛️', free: true },
 ];
 
 const proPdfTools = [
@@ -92,7 +101,7 @@ export function Navbar() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 6 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute top-full left-0 mt-1 w-64 glass rounded-2xl p-2 shadow-xl border border-border"
+                    className="absolute top-full left-0 mt-1 w-[520px] grid grid-cols-2 gap-1 glass rounded-2xl p-3 shadow-xl border border-border z-50"
                   >
                     {pdfTools.map((tool) => (
                       <Link

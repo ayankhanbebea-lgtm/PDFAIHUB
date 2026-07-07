@@ -36,6 +36,11 @@ const toolLabels: Record<string, string> = {
   chat: 'AI Chat', flashcards: 'Flashcards', quiz: 'Quiz',
   unlock: 'PDF Unlock', watermark: 'PDF Watermark', rotate: 'PDF Rotate',
   organize: 'PDF Organize', ocr: 'OCR Extract', exam: 'AI Exam Mode',
+  'jpg-to-pdf': 'JPG to PDF', 'word-to-pdf': 'Word to PDF',
+  'powerpoint-to-pdf': 'PowerPoint to PDF', 'excel-to-pdf': 'Excel to PDF',
+  'html-to-pdf': 'HTML to PDF', 'pdf-to-jpg': 'PDF to JPG',
+  'pdf-to-powerpoint': 'PDF to PowerPoint', 'pdf-to-excel': 'PDF to Excel',
+  'pdf-to-pdfa': 'PDF to PDF/A',
 };
 
 const toolEmoji: Record<string, string> = {
@@ -44,6 +49,11 @@ const toolEmoji: Record<string, string> = {
   chat: '💬', flashcards: '🃏', quiz: '❓',
   unlock: '🔓', watermark: '📝', rotate: '🔄',
   organize: '📊', ocr: '🔍', exam: '🎓',
+  'jpg-to-pdf': '🖼️', 'word-to-pdf': '📝',
+  'powerpoint-to-pdf': '📊', 'excel-to-pdf': '📈',
+  'html-to-pdf': '🌐', 'pdf-to-jpg': '🖼️',
+  'pdf-to-powerpoint': '📊', 'pdf-to-excel': '📈',
+  'pdf-to-pdfa': '🏛️',
 };
 
 export default function DashboardPage() {

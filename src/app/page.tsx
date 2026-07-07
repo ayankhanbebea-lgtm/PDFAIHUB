@@ -14,6 +14,15 @@ import { ArrowRight } from 'lucide-react';const freePdfTools = [
   { icon: '📝', name: 'PDF to Word', desc: 'Convert PDF to editable DOCX format', href: '/tools/pdf-to-word', color: 'from-orange-500 to-amber-500' },
   { icon: '🖼️', name: 'Image to PDF', desc: 'Convert JPG, PNG, WEBP to PDF', href: '/tools/image-to-pdf', color: 'from-red-500 to-rose-500' },
   { icon: '🔒', name: 'PDF Protect', desc: 'Add password security to your document', href: '/tools/protect', color: 'from-slate-500 to-gray-600' },
+  { icon: '🖼️', name: 'JPG to PDF', desc: 'Convert JPG/JPEG images to PDF', href: '/tools/jpg-to-pdf', color: 'from-orange-500 to-rose-500' },
+  { icon: '📝', name: 'Word to PDF', desc: 'Convert DOCX and DOC files to PDF', href: '/tools/word-to-pdf', color: 'from-blue-600 to-sky-500' },
+  { icon: '📊', name: 'PowerPoint to PDF', desc: 'Convert PPTX and PPT slides to PDF', href: '/tools/powerpoint-to-pdf', color: 'from-red-600 to-orange-500' },
+  { icon: '📈', name: 'Excel to PDF', desc: 'Convert Excel spreadsheets to PDF', href: '/tools/excel-to-pdf', color: 'from-green-600 to-emerald-500' },
+  { icon: '🌐', name: 'HTML to PDF', desc: 'Convert web pages/HTML files to PDF', href: '/tools/html-to-pdf', color: 'from-purple-600 to-indigo-500' },
+  { icon: '🖼️', name: 'PDF to JPG', desc: 'Convert PDF pages into high-quality JPGs', href: '/tools/pdf-to-jpg', color: 'from-rose-500 to-pink-500' },
+  { icon: '📊', name: 'PDF to PowerPoint', desc: 'Convert PDF slides to PPTX presentation', href: '/tools/pdf-to-powerpoint', color: 'from-orange-600 to-red-500' },
+  { icon: '📈', name: 'PDF to Excel', desc: 'Extract PDF data to Excel spreadsheets', href: '/tools/pdf-to-excel', color: 'from-emerald-500 to-teal-500' },
+  { icon: '🏛️', name: 'PDF to PDF/A', desc: 'Convert PDF to PDF/A ISO archive standard', href: '/tools/pdf-to-pdfa', color: 'from-gray-500 to-slate-700' },
 ];
 
 const proPdfTools = [
