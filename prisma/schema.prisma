@@ -237,6 +237,9 @@ model ExamPackage {
   questionsCount  Int      // e.g. 150
   flashcardsCount Int      // e.g. 120
   difficulty      String?  // e.g. "Medium", "Hard"
+  estimatedExamScore Int?
+  processingTime      String?
+  difficultyAnalysis  Json?
   
   // Package sections stored as JSON
   smartNotes      Json?

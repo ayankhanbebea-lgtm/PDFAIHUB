@@ -1,11 +1,75 @@
-// src/lib/office-converter.ts
 import fs from 'fs';
 import path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import mammoth from 'mammoth';
+import { initConversionEngine, getConverterStatus, runPowerShell, recordSuccess, recordError, execWithTimeout } from './converter-init';
 
-const execPromise = promisify(exec);
+// Automatically initialize the conversion engine during server startup (skip during next build phase)
+if (process.env.NEXT_PHASE !== 'phase-production-build') {
+  initConversionEngine()
+    .then((status) => {
+      console.log('[office-converter] Engine startup check completed successfully:', status);
+    })
+    .catch((err) => {
+      console.error('[office-converter] Engine startup check failed:', err);
+    });
+}
+
+/**
+ * Converts a PowerPoint presentation to PDF using native Windows COM Automation.
+ */
+export async function convertPowerPointViaCOM(inputPath: string, outputPath: string): Promise<void> {
+  const script = `
+    $ppt = New-Object -ComObject PowerPoint.Application
+    try {
+      $pres = $ppt.Presentations.Open('${inputPath.replace(/\\/g, '\\\\')}', -1, -1, 0)
+      $pres.SaveAs('${outputPath.replace(/\\/g, '\\\\')}', 32)
+      $pres.Close()
+    } finally {
+      $ppt.Quit()
+    }
+  `;
+  console.log(`[convertPowerPointViaCOM] Executing safe script...`);
+  await runPowerShell(script);
+}
+
+/**
+ * Converts an Excel spreadsheet to PDF using native Windows COM Automation.
+ */
+export async function convertExcelViaCOM(inputPath: string, outputPath: string): Promise<void> {
+  const script = `
+    $excel = New-Object -ComObject Excel.Application
+    $excel.Visible = $false
+    $excel.DisplayAlerts = $false
+    try {
+      $wb = $excel.Workbooks.Open('${inputPath.replace(/\\/g, '\\\\')}')
+      $wb.ExportAsFixedFormat(0, '${outputPath.replace(/\\/g, '\\\\')}')
+      $wb.Close($false)
+    } finally {
+      $excel.Quit()
+    }
+  `;
+  console.log(`[convertExcelViaCOM] Executing safe script...`);
+  await runPowerShell(script);
+}
+
+/**
+ * Converts a PDF file to a PowerPoint presentation (.pptx) using native Windows COM Automation.
+ */
+export async function convertPDFToPPTXViaCOM(pdfPath: string, outputPath: string): Promise<void> {
+  const script = `
+    $ppt = New-Object -ComObject PowerPoint.Application
+    try {
+      $pres = $ppt.Presentations.Open('${pdfPath.replace(/\\/g, '\\\\')}', -1, -1, 0)
+      $pres.SaveAs('${outputPath.replace(/\\/g, '\\\\')}')
+      $pres.Close()
+    } finally {
+      $ppt.Quit()
+    }
+  `;
+  console.log(`[convertPDFToPPTXViaCOM] Executing safe script...`);
+  await runPowerShell(script);
+}
+
 
 /**
  * Dynamically resolves the absolute path of the soffice.exe executable on Windows.
@@ -32,23 +96,66 @@ export function getSofficeCmd(): string {
 }
 
 /**
- * Converts any supported Office document (Word, PowerPoint, Excel) to PDF using LibreOffice.
+ * Converts any supported Office document (Word, PowerPoint, Excel) to PDF.
+ * Uses LibreOffice if found, or falls back to native Windows COM Automation / Mammoth.
  */
 export async function convertToPDF(inputPath: string, outDir: string): Promise<string> {
-  const cmd = getSofficeCmd();
-  const command = `${cmd} --headless --convert-to pdf --outdir "${outDir}" "${inputPath}"`;
-  console.log(`[convertToPDF] Executing: ${command}`);
-  await execPromise(command);
-
-  // The output file name matches the input but has a .pdf extension
+  const inputExt = path.extname(inputPath).toLowerCase();
   const inputBasename = path.basename(inputPath, path.extname(inputPath));
   const expectedPdfPath = path.join(outDir, `${inputBasename}.pdf`);
 
-  if (!fs.existsSync(expectedPdfPath)) {
-    throw new Error('Office to PDF conversion failed. Output PDF file was not generated.');
-  }
+  const sofficePath = getSofficePath();
+  const status = getConverterStatus();
 
-  return expectedPdfPath;
+  console.log(`[convertToPDF] Converting: ${inputPath}. Ext: ${inputExt}. Soffice: ${sofficePath || 'none'}`);
+
+  try {
+    if (sofficePath) {
+      const cmd = `"${sofficePath}"`;
+      const command = `${cmd} --headless --convert-to pdf --outdir "${outDir}" "${inputPath}"`;
+      console.log(`[convertToPDF] Executing LibreOffice: ${command}`);
+      await execWithTimeout(command, 60000);
+    } else {
+      console.log(`[convertToPDF] LibreOffice is not installed. Using native conversion fallback...`);
+      
+      if (inputExt === '.pptx' || inputExt === '.ppt') {
+        if (status?.powerpointCOMReady) {
+          console.log(`[convertToPDF] Converting PowerPoint via COM Automation: ${inputPath}`);
+          await convertPowerPointViaCOM(inputPath, expectedPdfPath);
+        } else {
+          throw new Error(
+            'PowerPoint conversion failed: Neither LibreOffice nor Microsoft PowerPoint COM engine is installed on the host system.'
+          );
+        }
+      } else if (inputExt === '.xlsx' || inputExt === '.xls') {
+        if (status?.excelCOMReady) {
+          console.log(`[convertToPDF] Converting Excel via COM Automation: ${inputPath}`);
+          await convertExcelViaCOM(inputPath, expectedPdfPath);
+        } else {
+          throw new Error(
+            'Excel conversion failed: Neither LibreOffice nor Microsoft Excel COM engine is installed on the host system.'
+          );
+        }
+      } else if (inputExt === '.docx') {
+        console.log(`[convertToPDF] Word document. Falling back to Mammoth pure JS parser...`);
+        await docxToPDF(inputPath, expectedPdfPath);
+      } else {
+        throw new Error(
+          `Unsupported conversion file type "${inputExt}" without LibreOffice installation.`
+        );
+      }
+    }
+
+    if (!fs.existsSync(expectedPdfPath) || fs.statSync(expectedPdfPath).size === 0) {
+      throw new Error('Office to PDF conversion failed. The output PDF file was not generated or has a size of 0 bytes.');
+    }
+
+    recordSuccess();
+    return expectedPdfPath;
+  } catch (err: any) {
+    recordError(err.message);
+    throw err;
+  }
 }
 
 /**
@@ -57,7 +164,7 @@ export async function convertToPDF(inputPath: string, outDir: string): Promise<s
 export async function htmlToPDF(htmlPath: string, outPdfPath: string): Promise<void> {
   const command = `mutool convert -o "${outPdfPath}" "${htmlPath}"`;
   console.log(`[htmlToPDF] Executing: ${command}`);
-  await execPromise(command);
+  await execWithTimeout(command, 30000);
 
   if (!fs.existsSync(outPdfPath)) {
     throw new Error('HTML to PDF conversion failed. Output PDF file was not generated.');
@@ -71,7 +178,7 @@ export async function pdfToImages(pdfPath: string, outDir: string): Promise<stri
   const outputPattern = path.join(outDir, 'page-%d.png');
   const command = `mutool convert -o "${outputPattern}" "${pdfPath}"`;
   console.log(`[pdfToImages] Executing: ${command}`);
-  await execPromise(command);
+  await execWithTimeout(command, 30000);
 
   const files = fs.readdirSync(outDir);
   const pngFiles = files
@@ -107,38 +214,88 @@ export async function pdfToImages(pdfPath: string, outDir: string): Promise<stri
  * Converts a PDF file to PowerPoint (PPTX) using LibreOffice Draw's headless export.
  */
 export async function pdfToPPTX(pdfPath: string, outDir: string): Promise<string> {
-  const cmd = getSofficeCmd();
-  const command = `${cmd} --headless --convert-to pptx --outdir "${outDir}" "${pdfPath}"`;
-  console.log(`[pdfToPPTX] Executing: ${command}`);
-  await execPromise(command);
-
   const inputBasename = path.basename(pdfPath, path.extname(pdfPath));
   const expectedPptxPath = path.join(outDir, `${inputBasename}.pptx`);
 
-  if (!fs.existsSync(expectedPptxPath)) {
-    throw new Error('PDF to PPTX conversion failed. Output PPTX file not found.');
-  }
+  console.log(`[pdfToPPTX] Redesigned Architecture: PDF -> Images -> PPTX`);
+  
+  const tempImgDir = path.join(outDir, `pdf-to-ppt-img-${Date.now()}`);
+  fs.mkdirSync(tempImgDir, { recursive: true });
 
-  return expectedPptxPath;
+  try {
+    // 1. Convert PDF pages to high-resolution JPG images using mutool + sharp
+    console.log(`[pdfToPPTX] Rendering PDF pages to images...`);
+    const imgPaths = await pdfToImages(pdfPath, tempImgDir);
+    console.log(`[pdfToPPTX] Rendered ${imgPaths.length} pages.`);
+
+    if (imgPaths.length === 0) {
+      throw new Error('No pages could be rendered from the PDF file.');
+    }
+
+    // 2. Create PPTX presentation and place one image per slide
+    console.log(`[pdfToPPTX] Generating PPTX slides via pptxgenjs...`);
+    const pptxgen = (await import('pptxgenjs')).default;
+    const pptx = new pptxgen();
+
+    for (const imgPath of imgPaths) {
+      const slide = pptx.addSlide();
+      
+      // Place image spanning the entire slide area to preserve aspect ratio / cover page size
+      slide.addImage({
+        path: imgPath,
+        x: 0,
+        y: 0,
+        w: '100%',
+        h: '100%'
+      });
+    }
+
+    // 3. Save the presentation
+    console.log(`[pdfToPPTX] Writing PPTX file to: ${expectedPptxPath}`);
+    await pptx.writeFile({ fileName: expectedPptxPath });
+    console.log(`[pdfToPPTX] PPTX generated successfully. Size: ${fs.statSync(expectedPptxPath).size} bytes`);
+
+    recordSuccess();
+    return expectedPptxPath;
+  } catch (err: any) {
+    console.error(`[pdfToPPTX] Error during conversion: ${err.message}`);
+    recordError(err.message);
+    throw err;
+  } finally {
+    // Clean up temporary image directory and files
+    try {
+      fs.rmSync(tempImgDir, { recursive: true, force: true });
+    } catch {}
+  }
 }
 
 /**
  * Converts a PDF file to PDF/A archive standard format using LibreOffice's writer_pdf_Export filter.
  */
 export async function pdfToPDFA(pdfPath: string, outDir: string): Promise<string> {
-  const cmd = getSofficeCmd();
-  const command = `${cmd} --headless --convert-to pdf:writer_pdf_Export --outdir "${outDir}" "${pdfPath}"`;
-  console.log(`[pdfToPDFA] Executing: ${command}`);
-  await execPromise(command);
-
+  const sofficePath = getSofficePath();
   const inputBasename = path.basename(pdfPath, path.extname(pdfPath));
   const expectedPdfPath = path.join(outDir, `${inputBasename}.pdf`);
 
-  if (!fs.existsSync(expectedPdfPath)) {
-    throw new Error('PDF to PDF/A conversion failed. Output PDF file not found.');
-  }
+  try {
+    if (!sofficePath) {
+      throw new Error('PDF to PDF/A conversion failed: LibreOffice Writer is not installed on this server.');
+    }
+    const cmd = `"${sofficePath}"`;
+    const command = `${cmd} --headless --convert-to pdf:writer_pdf_Export --outdir "${outDir}" "${pdfPath}"`;
+    console.log(`[pdfToPDFA] Executing: ${command}`);
+    await execWithTimeout(command, 60000);
 
-  return expectedPdfPath;
+    if (!fs.existsSync(expectedPdfPath) || fs.statSync(expectedPdfPath).size === 0) {
+      throw new Error('PDF to PDF/A conversion failed. Output PDF/A file not found or size is 0.');
+    }
+
+    recordSuccess();
+    return expectedPdfPath;
+  } catch (err: any) {
+    recordError(err.message);
+    throw err;
+  }
 }
 
 /**

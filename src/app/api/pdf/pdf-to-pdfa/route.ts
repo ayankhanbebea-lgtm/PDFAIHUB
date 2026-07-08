@@ -2,7 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { pdfToPDFA, getSofficePath } from '@/lib/office-converter';
+import { pdfToPDFA } from '@/lib/office-converter';
+import { initConversionEngine, getConverterStatus } from '@/lib/converter-init';
 import { checkUsage, incrementUsage, logUsage } from '@/lib/rate-limit';
 import { getGuestIdentifier, checkGuestLimit, incrementGuestUsage } from '@/lib/guest-limit';
 import prisma from '@/lib/prisma';
@@ -44,10 +45,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Valid PDF document required' }, { status: 400 });
     }
 
-    // Check if LibreOffice is ready
-    const sofficePath = getSofficePath();
-    if (!sofficePath) {
-      return NextResponse.json({ error: 'PDF/A converter engine is currently installing or initializing. Please try again in a few seconds.' }, { status: 503 });
+    // Ensure conversion engine status is loaded
+    let status = getConverterStatus();
+    if (!status) {
+      status = await initConversionEngine();
+    }
+
+    if (status.libreOfficeStatus === 'MISSING') {
+      return NextResponse.json({
+        error: 'PDF/A conversion is temporarily unavailable. Please try again later.',
+        logs: status.errorLogs
+      }, { status: 503 });
     }
 
     // Create unique temp directory

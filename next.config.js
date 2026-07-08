@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Fix for pdf-parse, sharp, and AI PDF processing packages
-  serverExternalPackages: ['pdf-parse', 'sharp', 'mammoth', 'canvas', 'muhammara', 'pdfjs-dist', 'tesseract.js', 'mupdf'],
+  serverExternalPackages: ['pdf-parse', 'sharp', 'mammoth', 'canvas', 'muhammara', 'pdfjs-dist', 'tesseract.js', 'mupdf', 'pptxgenjs'],
 
 
 

@@ -2,7 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { convertToPDF, getSofficePath } from '@/lib/office-converter';
+import { convertToPDF } from '@/lib/office-converter';
+import { initConversionEngine, getConverterStatus } from '@/lib/converter-init';
 import { checkUsage, incrementUsage, logUsage } from '@/lib/rate-limit';
 import { getGuestIdentifier, checkGuestLimit, incrementGuestUsage } from '@/lib/guest-limit';
 import prisma from '@/lib/prisma';
@@ -44,10 +45,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Valid Excel spreadsheet (.xls or .xlsx) required' }, { status: 400 });
     }
 
-    // Check if LibreOffice is ready
-    const sofficePath = getSofficePath();
-    if (!sofficePath) {
-      return NextResponse.json({ error: 'Excel converter engine is currently installing or initializing. Please try again in a few seconds.' }, { status: 503 });
+    // Ensure conversion engine status is loaded
+    let status = getConverterStatus();
+    if (!status) {
+      status = await initConversionEngine();
+    }
+
+    if (status.libreOfficeStatus === 'MISSING' && !status.excelCOMReady) {
+      return NextResponse.json({
+        error: 'Excel conversion engine is not available. Please verify Microsoft Excel or LibreOffice is installed on the server host.',
+        logs: status.errorLogs
+      }, { status: 503 });
     }
 
     // Create unique temp directory

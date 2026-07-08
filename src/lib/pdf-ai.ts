@@ -298,3 +298,125 @@ export async function getPDFPageCount(pdfBuffer: Buffer): Promise<number> {
     return 0;
   }
 }
+
+export interface PDFPageData {
+  pageNumber: number;
+  text: string;
+}
+
+/**
+ * Extracts selectable text page-by-page from the provided PDF.
+ */
+export async function extractPagesFromPDF(pdfBuffer: Buffer): Promise<PDFPageData[]> {
+  console.log(`[pdf-ai] Starting page-by-page extraction — buffer: ${pdfBuffer.length} bytes`);
+  const pages: PDFPageData[] = [];
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pdfParse = require('pdf-parse/lib/pdf-parse.js');
+
+    await pdfParse(pdfBuffer, {
+      max: 0,
+      pagerender: (pageData: any) => {
+        return pageData.getTextContent().then((textContent: any) => {
+          let text = '';
+          let lastY = -1;
+          for (const item of textContent.items) {
+            if (lastY !== -1 && item.transform[5] !== lastY) {
+              text += '\n';
+            }
+            text += item.str;
+            lastY = item.transform[5];
+          }
+          const pageNumber = pageData.pageIndex + 1;
+          pages.push({ pageNumber, text: text.trim() });
+          return text;
+        });
+      }
+    });
+  } catch (err: any) {
+    console.error('[pdf-ai] page-by-page pdf-parse failed:', err.message);
+    const fullText = await extractTextFromPDF(pdfBuffer);
+    const mockPages = fullText.split('\n\n');
+    mockPages.forEach((pText, i) => {
+      pages.push({ pageNumber: i + 1, text: pText.trim() });
+    });
+  }
+
+  pages.sort((a, b) => a.pageNumber - b.pageNumber);
+  console.log(`[pdf-ai] Successfully extracted ${pages.length} pages.`);
+  return pages;
+}
+
+export interface DocumentChunk {
+  id: string;
+  pageNumber: number;
+  text: string;
+  wordCount: number;
+}
+
+/**
+ * Splits extracted pages into overlapping chunks of word/token count.
+ */
+export function chunkPages(pages: PDFPageData[], chunkSize: number = 300, overlap: number = 50): DocumentChunk[] {
+  const chunks: DocumentChunk[] = [];
+  let chunkId = 0;
+
+  for (const page of pages) {
+    const words = page.text.split(/\s+/).filter(w => w.length > 0);
+    if (words.length === 0) continue;
+
+    let i = 0;
+    while (i < words.length) {
+      const chunkWords = words.slice(i, i + chunkSize);
+      const chunkText = chunkWords.join(' ');
+
+      chunks.push({
+        id: `chunk-${chunkId++}`,
+        pageNumber: page.pageNumber,
+        text: chunkText,
+        wordCount: chunkWords.length
+      });
+
+      i += (chunkSize - overlap);
+      if (i >= words.length || chunkWords.length < chunkSize) {
+        break;
+      }
+    }
+  }
+
+  console.log(`[pdf-ai] Chunked ${pages.length} pages into ${chunks.length} chunks (chunkSize=${chunkSize}, overlap=${overlap}).`);
+  return chunks;
+}
+
+export interface PageChunk {
+  chunkIndex: number;
+  startPage: number;
+  endPage: number;
+  text: string;
+  pages: PDFPageData[];
+}
+
+/**
+ * Groups pages into page chunks (e.g. 10 pages per chunk) for progressive generation.
+ */
+export function groupPagesIntoChunks(pages: PDFPageData[], pageSize: number = 10): PageChunk[] {
+  const chunks: PageChunk[] = [];
+  let chunkIndex = 0;
+  for (let i = 0; i < pages.length; i += pageSize) {
+    const chunkPages = pages.slice(i, i + pageSize);
+    const text = chunkPages.map(p => `[Page ${p.pageNumber}]\n${p.text}`).join('\n\n');
+    chunks.push({
+      chunkIndex: chunkIndex++,
+      startPage: chunkPages[0].pageNumber,
+      endPage: chunkPages[chunkPages.length - 1].pageNumber,
+      text,
+      pages: chunkPages
+    });
+  }
+  console.log(`[pdf-ai] Grouped ${pages.length} pages into ${chunks.length} page-chunks (pageSize=${pageSize}).`);
+  return chunks;
+}
+
+
+

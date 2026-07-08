@@ -1,19 +1,58 @@
-// src/app/api/ai/exam/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { generateExamPackage } from '@/lib/ai';
-import { extractTextFromPDF } from '@/lib/pdf-ai';
+import { generateExamChunk, mergeChunkResults } from '@/lib/ai';
+import { extractPagesFromPDF, groupPagesIntoChunks, PageChunk } from '@/lib/pdf-ai';
 import { checkUsage, incrementUsage, logUsage } from '@/lib/rate-limit';
 import prisma from '@/lib/prisma';
+import fs from 'fs';
+import path from 'path';
 
 export const runtime = 'nodejs';
-export const maxDuration = 120;
+export const maxDuration = 120; // 2 minutes execution window
+
+function getCachePath(userId: string, filename: string, size: number) {
+  const safeName = filename.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const cacheDir = path.join(process.env.APPDATA || '', 'antigravity', 'exam_cache');
+  if (!fs.existsSync(cacheDir)) {
+    fs.mkdirSync(cacheDir, { recursive: true });
+  }
+  return path.join(cacheDir, `cache_${userId}_${safeName}_${size}.json`);
+}
+
+function loadCache(cachePath: string) {
+  if (fs.existsSync(cachePath)) {
+    try {
+      return JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function saveCache(cachePath: string, state: any) {
+  try {
+    fs.writeFileSync(cachePath, JSON.stringify(state), 'utf8');
+  } catch (err) {
+    console.error('Failed to write exam cache:', err);
+  }
+}
+
+function clearCache(cachePath: string) {
+  try {
+    if (fs.existsSync(cachePath)) {
+      fs.unlinkSync(cachePath);
+    }
+  } catch (err) {
+    console.error('Failed to clear exam cache:', err);
+  }
+}
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
   }
 
   const isPro = session.user.plan === 'PRO';
@@ -21,9 +60,12 @@ export async function POST(request: NextRequest) {
   // Check usage limits
   const usage = await checkUsage(session.user.id, 'ai');
   if (!usage.allowed) {
-    return NextResponse.json(
-      { error: "You've used all 10 free AI requests. Upgrade to Pro for unlimited AI features, or wait until your 24-hour limit resets.", upgrade: true },
-      { status: 429 }
+    return new Response(
+      JSON.stringify({
+        error: "You've used all 10 free AI requests. Upgrade to Pro for unlimited AI features, or wait until your 24-hour limit resets.",
+        upgrade: true
+      }),
+      { status: 429, headers: { 'Content-Type': 'application/json' } }
     );
   }
 
@@ -33,59 +75,237 @@ export async function POST(request: NextRequest) {
     const provider = (formData.get('provider') as 'openai' | 'gemini' | 'groq') || 'groq';
 
     if (!file || file.type !== 'application/pdf') {
-      return NextResponse.json({ error: 'Valid PDF required' }, { status: 400 });
+      return new Response(JSON.stringify({ error: 'Valid PDF required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const text = await extractTextFromPDF(buffer);
+    const encoder = new TextEncoder();
+    
+    // Create the ReadableStream for progressive Ndjson response
+    const customStream = new ReadableStream({
+      async start(controller) {
+        function send(data: any) {
+          controller.enqueue(encoder.encode(JSON.stringify(data) + '\n'));
+        }
 
-    if (!text?.trim()) {
-      return NextResponse.json({ error: 'Could not extract text from PDF' }, { status: 400 });
-    }
+        const cachePath = getCachePath(session.user.id, file.name, file.size);
+        let cachedData = loadCache(cachePath);
 
-    // Generate full package
-    const examData = await generateExamPackage(text, provider);
+        try {
+          send({ type: 'status', message: 'Extracting content page-by-page from PDF...' });
+          const pages = await extractPagesFromPDF(buffer);
+          
+          const wordsTotal = pages.reduce((acc, p) => acc + p.text.split(/\s+/).length, 0);
+          console.log(`[route] Extracted ${pages.length} pages, ${wordsTotal} words.`);
 
-    // Save package in DB only if user is PRO
-    let packageId = null;
-    if (isPro) {
-      const pkg = await prisma.examPackage.create({
-        data: {
-          userId: session.user.id,
-          title: `Exam Package: ${file.name.replace(/\.[^/.]+$/, "")}`,
-          fileName: file.name,
-          fileSize: file.size,
-          readinessScore: examData.readinessScore || 85,
-          studyTime: examData.studyTime || '6h 20m',
-          questionsCount: examData.questionsCount || 15,
-          flashcardsCount: examData.flashcardsCount || 10,
-          difficulty: examData.difficulty || 'Medium',
-          smartNotes: examData.smartNotes,
-          importantTopics: examData.importantTopics,
-          pysQuestions: examData.pysQuestions,
-          mcqs: examData.mcqs,
-          flashcards: examData.flashcards,
-          revisionNotes: examData.revisionNotes,
-          memoryTricks: examData.memoryTricks,
-          mockTest: examData.mockTest,
-        },
-      });
-      packageId = pkg.id;
-    }
+          if (pages.length === 0) {
+            send({ type: 'error', error: 'Could not extract text from PDF' });
+            controller.close();
+            return;
+          }
 
-    // Log usage and increment quota
-    await incrementUsage(session.user.id, 'ai');
-    await logUsage(session.user.id, 'ai_exam_mode', { fileName: file.name, isPro });
+          send({
+            type: 'extraction_complete',
+            pageCount: pages.length,
+            wordCount: wordsTotal,
+            message: `✔ Content extracted: ${pages.length} pages, ${wordsTotal} words.`
+          });
 
-    return NextResponse.json({
-      success: true,
-      packageId,
-      examPackage: examData,
-      remaining: usage.remaining - 1,
+          // RAG Step 2: Progressive Chunking (Default chunk size of 3 pages for high-density processing)
+          const initialPageSize = 3;
+          const initialChunks = groupPagesIntoChunks(pages, initialPageSize);
+
+          send({
+            type: 'status',
+            message: `Grouping material into ${initialChunks.length} target sections...`
+          });
+
+          const chunksResults: any[] = (cachedData && cachedData.chunksResults) ? cachedData.chunksResults : [];
+          const startTime = Date.now();
+
+          // Recursive adaptive chunk generator
+          async function processChunkWithAdaptiveSize(chunk: PageChunk): Promise<any[]> {
+            try {
+              const result = await generateExamChunk(chunk, provider);
+              return [result];
+            } catch (err: any) {
+              console.warn(`[route] Error generating chunk ${chunk.chunkIndex} (pages ${chunk.startPage}-${chunk.endPage}):`, err.message);
+              
+              const pageSize = chunk.pages.length;
+              if (pageSize <= 1) {
+                // If it fails on single page, return a fallback empty structure to prevent crashing the whole pipeline
+                return [{
+                  chapterTitle: `Pages ${chunk.startPage}-${chunk.endPage} (Fallback Summary)`,
+                  smartNotes: {
+                    bulletPoints: [`Review content in original textbook on pages ${chunk.startPage}-${chunk.endPage}.`],
+                    definitions: [],
+                    formulas: [],
+                    examples: [],
+                    examTips: []
+                  },
+                  importantTopics: [],
+                  pyqQuestions: [],
+                  mcqs: [],
+                  flashcards: [],
+                  mockQuestions: []
+                }];
+              }
+
+              // Adaptive Step: Split chunk in half
+              const newPageSize = Math.max(1, Math.floor(pageSize / 2));
+              send({
+                type: 'status',
+                message: `⚠ Token warning: Slicing chunk size to ${newPageSize} pages for pages ${chunk.startPage}-${chunk.endPage}...`
+              });
+
+              const subChunks = groupPagesIntoChunks(chunk.pages, newPageSize);
+              const results: any[] = [];
+              for (const subChunk of subChunks) {
+                subChunk.chunkIndex = chunk.chunkIndex;
+                const subResults = await processChunkWithAdaptiveSize(subChunk);
+                results.push(...subResults);
+              }
+              return results;
+            }
+          }
+
+          // Concurrency limited chunk processor (limit = 3)
+          const concurrencyLimit = 3;
+          const activePromises: Set<Promise<any>> = new Set();
+          
+          for (let i = 0; i < initialChunks.length; i++) {
+            const chunk = initialChunks[i];
+
+            // Setup task promise
+            const taskPromise = (async () => {
+              // If already cached, load cached result
+              if (chunksResults[i]) {
+                const cachedRes = chunksResults[i];
+                send({
+                  type: 'progress',
+                  message: `✔ Loaded cached section (pages ${chunk.startPage}-${chunk.endPage}): "${cachedRes.chapterTitle}"`,
+                  chapterTitle: cachedRes.chapterTitle,
+                  chunkIndex: i,
+                  totalChunks: initialChunks.length
+                });
+                return cachedRes;
+              }
+
+              send({
+                type: 'status',
+                message: `Analyzing pages ${chunk.startPage}-${chunk.endPage} (Section ${i + 1}/${initialChunks.length})...`
+              });
+
+              const results = await processChunkWithAdaptiveSize(chunk);
+              const mergedChunkRes = results[0];
+              
+              send({
+                type: 'progress',
+                message: `✔ Generated section (pages ${chunk.startPage}-${chunk.endPage}): "${mergedChunkRes.chapterTitle}"`,
+                chapterTitle: mergedChunkRes.chapterTitle,
+                chunkIndex: i,
+                totalChunks: initialChunks.length
+              });
+
+              return mergedChunkRes;
+            })();
+
+            activePromises.add(taskPromise);
+            
+            taskPromise.then((res) => {
+              chunksResults[i] = res;
+              // Save updated progress cache to disk
+              saveCache(cachePath, { chunksResults });
+            }).finally(() => {
+              activePromises.delete(taskPromise);
+            });
+
+            if (activePromises.size >= concurrencyLimit) {
+              await Promise.race(activePromises);
+            }
+          }
+
+          // Wait for final active chunks to resolve
+          await Promise.all(activePromises);
+
+          // RAG Step 3: Merge all chunk results into one final package
+          send({ type: 'status', message: 'Merging all sections and compiling metrics...' });
+          const validResults = chunksResults.filter(Boolean);
+          if (validResults.length === 0) {
+            throw new Error("Failed to generate content for all chapters.");
+          }
+
+          const examData = mergeChunkResults(validResults, file.name, file.size);
+          
+          const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1) + 's';
+          examData.processingTime = totalDuration;
+
+          // Save package in DB only if user is PRO
+          let packageId = null;
+          if (isPro) {
+            send({ type: 'status', message: 'Saving Exam Package to history...' });
+            const pkg = await prisma.examPackage.create({
+              data: {
+                userId: session.user.id,
+                title: `Exam Package: ${file.name.replace(/\.[^/.]+$/, "")}`,
+                fileName: file.name,
+                fileSize: file.size,
+                readinessScore: examData.readinessScore || 85,
+                studyTime: examData.studyTime || '6h 20m',
+                questionsCount: examData.questionsCount || 15,
+                flashcardsCount: examData.flashcardsCount || 10,
+                difficulty: examData.difficulty || 'Medium',
+                estimatedExamScore: examData.estimatedExamScore || 85,
+                processingTime: totalDuration,
+                difficultyAnalysis: examData.difficultyAnalysis,
+                smartNotes: examData.smartNotes,
+                importantTopics: examData.importantTopics,
+                pysQuestions: examData.pysQuestions,
+                mcqs: examData.mcqs,
+                flashcards: examData.flashcards,
+                revisionNotes: examData.revisionNotes,
+                memoryTricks: examData.memoryTricks,
+                mockTest: examData.mockTest,
+              },
+            });
+            packageId = pkg.id;
+          }
+
+          // Clear disk cache upon successful generation
+          clearCache(cachePath);
+
+          // Log usage and increment quota
+          await incrementUsage(session.user.id, 'ai');
+          await logUsage(session.user.id, 'ai_exam_mode', { fileName: file.name, isPro });
+
+          // Send final completion message
+          send({
+            type: 'final_complete',
+            packageId,
+            examPackage: examData,
+            remaining: usage.remaining - 1,
+            message: `✔ Complete study package compiled in ${totalDuration}!`
+          });
+
+          controller.close();
+        } catch (streamErr: any) {
+          console.error('[route] Stream error:', streamErr);
+          send({ type: 'error', error: streamErr.message || 'Stream processing failed' });
+          controller.close();
+        }
+      }
+    });
+
+    return new Response(customStream, {
+      headers: {
+        'Content-Type': 'application/x-ndjson',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+      }
     });
   } catch (error: any) {
-    console.error('[ai-exam] error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to generate exam package' }, { status: 500 });
+    console.error('[ai-exam] POST setup error:', error);
+    return new Response(JSON.stringify({ error: error.message || 'Failed to initialize generation' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }
 
@@ -109,3 +329,4 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({ success: true, packages });
 }
+
