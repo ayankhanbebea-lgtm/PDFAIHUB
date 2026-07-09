@@ -79,7 +79,11 @@ export default function DashboardPage() {
         .catch(() => setFiles([]))
         .finally(() => setFilesLoading(false));
 
-      axios.get('/api/user/usage')
+      axios.get('/api/user/usage', {
+        headers: {
+          'x-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone
+        }
+      })
         .then(({ data }) => setUsage(data))
         .catch(console.error);
 
@@ -123,16 +127,16 @@ export default function DashboardPage() {
 
   if (!session) return null;
 
-  const isPro = session.user.plan === 'PRO';
+  const isPro = session.user.plan === 'PRO' || usage?.isPro === true;
 
-  // Extract usage counters
+  // Extract usage counters — usage API now returns null for Pro limits
   const pdfUsed = usage?.pdfUsed ?? 0;
-  const pdfLimit = isPro ? '∞' : (usage?.pdfLimit ?? 50);
-  const pdfRemaining = isPro ? '∞' : (usage?.pdfRemaining ?? 50);
+  const pdfLimit = isPro ? null : (usage?.pdfLimit ?? 50);
+  const pdfRemaining = usage?.pdfRemaining ?? (isPro ? null : 50);
 
   const aiUsed = usage?.aiUsed ?? 0;
-  const aiLimit = isPro ? '∞' : (usage?.aiLimit ?? 10);
-  const aiRemaining = isPro ? '∞' : (usage?.aiRemaining ?? 10);
+  const aiLimit = usage?.aiLimit ?? (isPro ? null : 5);
+  const aiRemaining = usage?.aiRemaining ?? (isPro ? null : 5);
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
@@ -147,7 +151,7 @@ export default function DashboardPage() {
             <p className="text-gray-600 dark:text-gray-400 mt-1">
               {isPro
                 ? '⚡ Pro Plan — Unlimited AI & PDF operations'
-                : 'Free plan — 50 PDF operations + 10 AI requests per rolling 24 hours'}
+                : 'Free plan — 50 PDF operations + 5 AI requests per day'}
             </p>
           </div>
 
@@ -196,25 +200,38 @@ export default function DashboardPage() {
                 <TrendingUp className="w-4 h-4 text-primary" />
               </div>
               <p className="text-xl font-bold text-gray-900 dark:text-white">
-                {pdfUsed} / {isPro ? 'Unlimited' : pdfLimit}
+                {pdfUsed} {isPro ? '' : `/ ${pdfLimit}`}
               </p>
               <span className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">
-                {isPro ? 'Unlimited remaining' : `${pdfRemaining} operations left`}
+                {isPro ? 'Unlimited · No daily cap' : `${pdfRemaining} operations left`}
               </span>
             </div>
 
             {/* Card 3: AI Usage */}
             <div className="bg-card rounded-2xl p-5 border border-border flex flex-col justify-between transition-colors duration-300">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-muted-foreground">AI Usage</p>
+                <p className="text-sm text-muted-foreground">AI Requests</p>
                 <Brain className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-xl font-bold text-gray-900 dark:text-white">
-                {aiUsed} / {isPro ? 'Unlimited' : aiLimit}
-              </p>
-              <span className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">
-                {isPro ? 'Unlimited remaining' : `${aiRemaining} requests left`}
-              </span>
+              {isPro ? (
+                <>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    {aiUsed} Today
+                  </p>
+                  <span className="text-[10px] text-primary font-semibold mt-1">
+                    Plan: Unlimited ⚡
+                  </span>
+                </>
+              ) : (
+                <>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    {aiUsed} / {aiLimit} Used
+                  </p>
+                  <span className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">
+                    {aiRemaining} Remaining
+                  </span>
+                </>
+              )}
             </div>
 
             {/* Card 4: Next Reset / Subscription info */}

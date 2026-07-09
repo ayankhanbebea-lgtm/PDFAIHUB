@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { generateExamChunk, mergeChunkResults } from '@/lib/ai';
 import { extractPagesFromPDF, groupPagesIntoChunks, PageChunk } from '@/lib/pdf-ai';
-import { checkUsage, incrementUsage, logUsage } from '@/lib/rate-limit';
+import { checkAiAccess } from '@/lib/ai-access';
+import { incrementUsage, logUsage } from '@/lib/rate-limit';
 import prisma from '@/lib/prisma';
 import fs from 'fs';
 import path from 'path';
@@ -51,24 +52,12 @@ function clearCache(cachePath: string) {
 
 export async function POST(request: NextRequest) {
   const uploadStart = performance.now();
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
-  }
 
-  const isPro = session.user.plan === 'PRO';
-
-  // Check usage limits
-  const usage = await checkUsage(session.user.id, 'ai');
-  if (!usage.allowed) {
-    return new Response(
-      JSON.stringify({
-        error: "You've used all 10 free AI requests. Upgrade to Pro for unlimited AI features, or wait until your 24-hour limit resets.",
-        upgrade: true
-      }),
-      { status: 429, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
+  // ── ACCESS GUARD ─────────────────────────────────────────────────────────────
+  const access = await checkAiAccess(request);
+  if (!access.allowed) return access.response;
+  const { userId, isPro, usage, timezone } = access;
+  // ─────────────────────────────────────────────────────────────────────────────
 
   try {
     const formData = await request.formData();
@@ -94,7 +83,7 @@ export async function POST(request: NextRequest) {
         // Report upload timing first
         send({ type: 'timing', stage: 'PDF Upload', durationMs: uploadDuration });
 
-        const cachePath = getCachePath(session.user.id, file.name, file.size);
+        const cachePath = getCachePath(userId, file.name, file.size);
         let cachedData = loadCache(cachePath);
 
         try {
@@ -260,7 +249,7 @@ export async function POST(request: NextRequest) {
           send({ type: 'status', message: 'Merging all sections and compiling metrics...' });
           const validResults = chunksResults.filter(Boolean);
           if (validResults.length === 0) {
-            throw new Error("Failed to generate content for all chapters.");
+            throw new Error("We encountered a temporary processing issue. Please try again.");
           }
 
           const examData = mergeChunkResults(validResults, file.name, file.size);
@@ -275,7 +264,7 @@ export async function POST(request: NextRequest) {
             send({ type: 'status', message: 'Saving Exam Package to history...' });
             const pkg = await prisma.examPackage.create({
               data: {
-                userId: session.user.id,
+                userId,
                 title: `Exam Package: ${file.name.replace(/\.[^/.]+$/, "")}`,
                 fileName: file.name,
                 fileSize: file.size,
@@ -305,8 +294,10 @@ export async function POST(request: NextRequest) {
 
           clearCache(cachePath);
 
-          await incrementUsage(session.user.id, 'ai');
-          await logUsage(session.user.id, 'ai_exam_mode', { fileName: file.name, isPro });
+          // ── Consume one AI request (after success) ──────────────────────────
+          await incrementUsage(userId, 'ai', timezone);
+          await logUsage(userId, 'ai_exam_mode', { fileName: file.name, isPro });
+          // ───────────────────────────────────────────────────────────────────
 
           send({
             type: 'final_complete',
@@ -334,7 +325,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('[ai-exam] POST setup error:', error);
-    return new Response(JSON.stringify({ error: error.message || 'Failed to initialize generation' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: 'We encountered an issue preparing the exam package. Please try again.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }
 

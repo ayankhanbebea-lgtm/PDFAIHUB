@@ -1,10 +1,9 @@
 // src/app/api/ai/summarize/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { generateSummary } from '@/lib/ai';
 import { extractTextFromPDF } from '@/lib/pdf-ai';
-import { checkUsage, incrementUsage, logUsage } from '@/lib/rate-limit';
+import { checkAiAccess } from '@/lib/ai-access';
+import { incrementUsage, logUsage } from '@/lib/rate-limit';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { priorityScheduler } from '@/lib/priority-queue';
 import prisma from '@/lib/prisma';
@@ -13,18 +12,11 @@ export const runtime = 'nodejs';
 export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const usage = await checkUsage(session.user.id, 'ai');
-  if (!usage.allowed) {
-    return NextResponse.json(
-      { error: "You've reached your free daily limit for AI operations. Upgrade to Pro for unlimited usage.", upgrade: true },
-      { status: 429 }
-    );
-  }
+  // ── ACCESS GUARD ─────────────────────────────────────────────────────────────
+  const access = await checkAiAccess(request);
+  if (!access.allowed) return access.response;
+  const { userId, isPro, usage, timezone } = access;
+  // ─────────────────────────────────────────────────────────────────────────────
 
   try {
     const formData = await request.formData();
@@ -43,7 +35,7 @@ export async function POST(request: NextRequest) {
     // Check if same file was already summarized (Token Optimization: Local Cache)
     const existingFile = await prisma.file.findFirst({
       where: {
-        userId: session.user.id,
+        userId,
         name: file.name,
         size: file.size,
         tool: 'summarize',
@@ -55,6 +47,7 @@ export async function POST(request: NextRequest) {
       const meta = existingFile.metadata as any;
       if (meta.summary) {
         console.log(`[summarize] Cache hit for ${file.name} (${file.size} bytes). Returning cached summary.`);
+        // Cached: don't consume a request
         return NextResponse.json({
           success: true,
           summary: meta.summary,
@@ -64,14 +57,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const isPro = session.user.plan === 'PRO';
     const buffer = Buffer.from(await file.arrayBuffer());
-    
+
     // Wrap text extraction in priority scheduler
     const text = await priorityScheduler.enqueue(async () => {
       return extractTextFromPDF(buffer);
     }, isPro);
-    
+
     console.log(`[summarize] extracted: ${text?.length ?? 0} chars`);
 
     if (!text || text.trim().length < 100) {
@@ -85,7 +77,7 @@ export async function POST(request: NextRequest) {
     const summary = await priorityScheduler.enqueue(async () => {
       return generateSummary(text, provider);
     }, isPro);
-    
+
     console.log(`[summarize] summary generated — shortSummary: ${summary?.shortSummary?.length ?? 0} chars`);
 
     // Cloudinary — optional
@@ -97,7 +89,7 @@ export async function POST(request: NextRequest) {
     ) {
       try {
         const uploaded = await uploadToCloudinary(buffer, {
-          folder: `pdfai-hub/${session.user.id}/ai-files`,
+          folder: `pdfai-hub/${userId}/ai-files`,
           resourceType: 'raw',
           format: 'pdf',
         });
@@ -110,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     const fileRecord = await prisma.file.create({
       data: {
-        userId: session.user.id,
+        userId,
         name: file.name,
         originalName: file.name,
         size: buffer.length,
@@ -119,21 +111,26 @@ export async function POST(request: NextRequest) {
         publicId,
         tool: 'summarize',
         status: 'COMPLETED',
-        metadata: { summaryGenerated: true, provider, summary },
+        metadata: { summaryGenerated: true, provider, summary } as any,
       },
     });
 
-    await incrementUsage(session.user.id, 'ai');
-    await logUsage(session.user.id, 'ai_summary', { fileName: file.name, provider });
+    // ── Consume one AI request (after success) ────────────────────────────────
+    await incrementUsage(userId, 'ai', timezone);
+    await logUsage(userId, 'ai_summary', { fileName: file.name, provider });
+    // ─────────────────────────────────────────────────────────────────────────
 
-    return NextResponse.json({ success: true, summary, fileId: fileRecord.id, remaining: usage.remaining - 1 });
+    return NextResponse.json({
+      success: true,
+      summary,
+      fileId: fileRecord.id,
+      remaining: usage.remaining - 1,
+    });
   } catch (error: any) {
     console.error('[summarize] ERROR:', error.message);
     const friendlyMsg = error.message?.includes('429') || error.message?.includes('rate limit')
       ? 'AI is currently busy. Switching to another AI model...'
       : 'Failed to generate summary due to a temporary processing issue. Please try again.';
-    return NextResponse.json({
-      error: friendlyMsg,
-    }, { status: 500 });
+    return NextResponse.json({ error: friendlyMsg }, { status: 500 });
   }
 }

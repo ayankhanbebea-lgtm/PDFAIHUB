@@ -5,7 +5,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, ChevronLeft, ChevronRight, RotateCcw, Download } from 'lucide-react';
-import { ToolLayout } from '@/components/tools/tool-layout';
+import { ToolLayout, useToolUsage } from '@/components/tools/tool-layout';
 import { FileDropzone } from '@/components/tools/file-dropzone';
 import type { Flashcard } from '@/types';
 
@@ -17,8 +17,14 @@ export default function FlashcardsPage() {
   const [flipped, setFlipped] = useState(false);
   const [count, setCount] = useState(20);
 
+  const toolUsage = useToolUsage();
+
   const handleGenerate = async () => {
     if (!files[0]) return toast.error('Upload a PDF first');
+    if (toolUsage?.isLimitReached) {
+      toolUsage.setShowUpgradeModal(true);
+      return;
+    }
 
     setLoading(true);
     setFlashcards([]);
@@ -28,13 +34,20 @@ export default function FlashcardsPage() {
       formData.append('file', files[0]);
       formData.append('count', count.toString());
 
-      const { data } = await axios.post('/api/ai/flashcards', formData);
+      const { data } = await axios.post('/api/ai/flashcards', formData, {
+        headers: {
+          'x-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone
+        }
+      });
       setFlashcards(data.flashcards);
       setCurrentIndex(0);
       setFlipped(false);
       toast.success(`${data.flashcards.length} flashcards created!`);
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to generate flashcards');
+      if (err.response?.status === 403 || err.response?.status === 429) {
+        toolUsage?.setShowUpgradeModal(true);
+      }
+      toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to generate flashcards');
     } finally {
       setLoading(false);
     }
@@ -99,9 +112,25 @@ export default function FlashcardsPage() {
                     <span>5</span><span>50</span>
                   </div>
                 </div>
-                <button onClick={handleGenerate} className="btn-brand w-full py-3.5 flex items-center justify-center gap-2 cursor-pointer">
-                  <Sparkles className="w-4 h-4" />
-                  Generate {count} Flashcards
+                <button
+                  onClick={handleGenerate}
+                  className={`w-full py-3.5 flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                    toolUsage?.isLimitReached
+                      ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-xl font-semibold'
+                      : 'btn-brand'
+                  }`}
+                >
+                  {toolUsage?.isLimitReached ? (
+                    <>
+                      <Sparkles className="w-4 h-4 animate-pulse" />
+                      Upgrade to Pro to Generate
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Generate {count} Flashcards
+                    </>
+                  )}
                 </button>
               </div>
             )}

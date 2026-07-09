@@ -118,6 +118,68 @@ Return JSON:
   }
 }
 
+// --- Helper Quiz Question and Flashcard validation / cleaning / fallbacks ---
+const fallbackQuestions: QuizQuestion[] = [
+  {
+    question: "What is the primary topic of the uploaded document?",
+    options: ["The document's main subject", "An unrelated topic", "General knowledge", "None of the above"],
+    correctIndex: 0,
+    explanation: "Please review the document's sections for more detail."
+  }
+];
+
+const fallbackFlashcards: Flashcard[] = [
+  {
+    front: "What is the key takeaway of this document?",
+    back: "Refer to the summary and chapters of the uploaded file."
+  }
+];
+
+function cleanQuizQuestions(questions: any[]): QuizQuestion[] {
+  if (!Array.isArray(questions)) return [];
+  const valid: QuizQuestion[] = [];
+  for (const q of questions) {
+    if (!q || typeof q !== 'object') continue;
+    const questionText = typeof q.question === 'string' ? q.question.trim() : '';
+    if (!questionText) continue;
+
+    let options = Array.isArray(q.options) 
+      ? q.options.map((o: any) => typeof o === 'string' ? o.trim() : String(o)).filter(Boolean)
+      : [];
+    if (options.length < 2) {
+      options = ["True", "False"];
+    }
+
+    let correctIndex = typeof q.correctIndex === 'number' ? q.correctIndex : 0;
+    if (correctIndex < 0 || correctIndex >= options.length) {
+      correctIndex = 0;
+    }
+
+    const explanation = typeof q.explanation === 'string' ? q.explanation.trim() : 'No explanation provided.';
+
+    valid.push({
+      question: questionText,
+      options,
+      correctIndex,
+      explanation,
+    });
+  }
+  return valid;
+}
+
+function cleanFlashcards(cards: any[]): Flashcard[] {
+  if (!Array.isArray(cards)) return [];
+  const valid: Flashcard[] = [];
+  for (const c of cards) {
+    if (!c || typeof c !== 'object') continue;
+    const front = typeof c.front === 'string' ? c.front.trim() : '';
+    const back = typeof c.back === 'string' ? c.back.trim() : '';
+    if (!front || !back) continue;
+    valid.push({ front, back });
+  }
+  return valid;
+}
+
 // ─── generateFlashcards ───────────────────────────────────────────────────────
 export async function generateFlashcards(
   text: string,
@@ -133,14 +195,16 @@ Text: ${text.slice(0, 8000)}
 
 {"flashcards": [{"front": "Question or term", "back": "Answer or definition"}]}`;
 
-  const response = await generateWithAI(prompt, systemPrompt, provider);
-
   try {
-    const cleaned = response.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    const response = await generateWithAIWithBackoff(prompt, systemPrompt, provider);
+    const cleaned = repairJson(response);
     const data = JSON.parse(cleaned);
-    return data.flashcards || [];
-  } catch {
-    return [{ front: 'What is this document about?', back: 'Review the uploaded document.' }];
+    const cards = Array.isArray(data.flashcards) ? data.flashcards : [];
+    const cleanedCards = cleanFlashcards(cards);
+    return cleanedCards.length > 0 ? cleanedCards : fallbackFlashcards;
+  } catch (err: any) {
+    console.warn('[generateFlashcards] failed completely, returning fallback:', err.message);
+    return fallbackFlashcards;
   }
 }
 
@@ -159,14 +223,16 @@ Text: ${text.slice(0, 8000)}
 
 {"questions": [{"question": "...", "options": ["A", "B", "C", "D"], "correctIndex": 0, "explanation": "..."}]}`;
 
-  const response = await generateWithAI(prompt, systemPrompt, provider);
-
   try {
-    const cleaned = response.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    const response = await generateWithAIWithBackoff(prompt, systemPrompt, provider);
+    const cleaned = repairJson(response);
     const data = JSON.parse(cleaned);
-    return data.questions || [];
-  } catch {
-    return [];
+    const questions = Array.isArray(data.questions) ? data.questions : [];
+    const cleanedQuestions = cleanQuizQuestions(questions);
+    return cleanedQuestions.length > 0 ? cleanedQuestions : fallbackQuestions;
+  } catch (err: any) {
+    console.warn('[generateQuiz] failed completely, returning fallback:', err.message);
+    return fallbackQuestions;
   }
 }
 
@@ -186,32 +252,65 @@ If the answer is not in the document, say "I couldn't find information about thi
 PDF CONTENT:
 ${pdfContent.slice(0, 10000)}`;
 
-  if (resolvedProvider === 'groq') {
-    const messages = [
-      { role: 'system' as const, content: systemPrompt },
-      ...conversationHistory.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-      { role: 'user' as const, content: question },
-    ];
-    const completion = await getGroq().chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages,
-      temperature: 0.3,
-      max_tokens: 1000,
-    });
-    return completion.choices[0]?.message?.content || 'Unable to process your question.';
+  let currentProvider = resolvedProvider;
+  let currentModel = 'llama-3.3-70b-versatile';
+  let attempts = 0;
+  const maxAttempts = 3;
+  let delay = 2000;
+
+  while (attempts < maxAttempts) {
+    try {
+      if (currentProvider === 'groq') {
+        const messages = [
+          { role: 'system' as const, content: systemPrompt },
+          ...conversationHistory.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+          { role: 'user' as const, content: question },
+        ];
+        const completion = await getGroq().chat.completions.create({
+          model: currentModel,
+          messages,
+          temperature: 0.3,
+          max_tokens: 1000,
+        });
+        return completion.choices[0]?.message?.content || 'I could not generate an answer at this moment.';
+      } else {
+        const model = getGemini().getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const history = conversationHistory.map(m => ({
+          role: m.role === 'user' ? 'user' : 'model',
+          parts: [{ text: m.content }],
+        }));
+        const chat = model.startChat({
+          history: [{ role: 'user', parts: [{ text: systemPrompt }] }, ...history],
+        });
+        const result = await chat.sendMessage(question);
+        return result.response.text();
+      }
+    } catch (err: any) {
+      attempts++;
+      console.warn(`[chatWithPDF] Attempt ${attempts} failed:`, err.message);
+      
+      if (attempts < maxAttempts) {
+        const isRateLimit = err.status === 429 || err.message?.includes('429') || err.message?.includes('rate limit');
+        if (isRateLimit && currentModel === 'llama-3.3-70b-versatile') {
+          currentModel = 'llama-3.1-8b-instant';
+        } else if (isRateLimit && currentProvider === 'groq') {
+          currentProvider = 'gemini';
+        }
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2;
+      }
+    }
   }
 
-  // Gemini
-  const model = getGemini().getGenerativeModel({ model: 'gemini-1.5-flash' });
-  const history = conversationHistory.map(m => ({
-    role: m.role === 'user' ? 'user' : 'model',
-    parts: [{ text: m.content }],
-  }));
-  const chat = model.startChat({
-    history: [{ role: 'user', parts: [{ text: systemPrompt }] }, ...history],
-  });
-  const result = await chat.sendMessage(question);
-  return result.response.text();
+  // Final fallback
+  try {
+    const model = getGemini().getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const result = await model.generateContent(`${systemPrompt}\n\nUser Question: ${question}`);
+    return result.response.text();
+  } catch (finalErr: any) {
+    console.error('[chatWithPDF] All attempts and fallbacks failed:', finalErr.message);
+    return "I'm sorry, I encountered a temporary connection issue. Please try asking your question again in a moment.";
+  }
 }
 
 
@@ -336,17 +435,23 @@ export async function generateWithAIWithBackoff(
       }
     } catch (err: any) {
       attempts++;
+      console.warn(`[ai] AI generation attempt ${attempts}/${maxAttempts} failed:`, err.message);
+
+      if (attempts >= maxAttempts) {
+        break;
+      }
+
       const isRateLimit = err.status === 429 || err.message?.includes('429') || err.message?.includes('rate limit') || err.message?.includes('TPM') || err.message?.includes('RPM');
 
       if (isRateLimit) {
-        console.warn(`[ai] Rate limit exceeded. Model: ${currentModel}. Retrying in ${delay}ms...`);
         if (attempts >= 2 && currentModel === 'llama-3.3-70b-versatile') {
           console.warn(`[ai] FALLBACK: Switching model to llama-3.1-8b-instant`);
           currentModel = 'llama-3.1-8b-instant';
         }
         await new Promise(resolve => setTimeout(resolve, delay));
-        delay *= 2;
+        delay = Math.min(delay * 2, 30000); // cap at 30s
       } else {
+        // Transient network or connection issue — wait 1.5s and retry
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
     }
@@ -370,14 +475,16 @@ export async function generateExamChunk(
   const systemPrompt = `You are a distinguished university professor and exam board setter. You write comprehensive study notes, create flashcards, MCQs, and mock exam questions.
 You must respond with valid JSON only. Raw JSON only, no backticks, no markdown code blocks.`;
 
+  // Bound chunk text to prevent Groq token limit overflow (approx 12k chars ~ 3k tokens safe)
+  const chunkTextBounded = chunk.text.slice(0, 12000);
   const prompt = `Analyze this textbook/study material context from Page ${chunk.startPage} to Page ${chunk.endPage}:
 ---
-${chunk.text}
+${chunkTextBounded}
 ---
 
 Generate:
 1. "chapterTitle": The actual chapter or section title extracted from the text (do not invent generic names like "Chapter X" or "Introduction" if there's an actual topic title in the text).
-2. "smartNotes": Chapter-wise smart notes including bullet points (at least 3 sentences per concept), definitions, formulas, worked examples, and exam tips. Each bullet point and element must contain a reference indicating which page it came from, e.g. "[Page X]".
+2. "smartNotes": Chapter-wise study notes including bullet points (at least 3 sentences per concept), definitions, formulas, worked examples, and exam tips. Each bullet point and element must contain a reference indicating which page it came from, e.g. "[Page X]".
 3. "importantTopics": Up to 3 important topics from this text, stating why they are important.
 4. "pyqQuestions": 1 Previous Year style exam question, with an ideal answer and guidelines. Must reference the source page number, e.g. "[From Page X]".
 5. "mcqs": Exactly 5 Multiple-Choice Questions (MCQs): mix of Easy, Medium, Hard. Each must have difficulty, question text, 4 options, correctIndex (0-3), and explanation referencing the source page number, e.g. "[Page X]". No duplicate questions.
@@ -449,11 +556,66 @@ Return this exact JSON structure:
       
       // Auto-repair JSON
       const cleanJson = repairJson(response);
-
       const parsed = JSON.parse(cleanJson);
-      if (!parsed.chapterTitle || !parsed.smartNotes) {
-        throw new Error("Missing required JSON fields");
+      
+      // Clean and validate fields
+      if (!parsed.chapterTitle || typeof parsed.chapterTitle !== 'string') {
+        parsed.chapterTitle = `Pages ${chunk.startPage}-${chunk.endPage} Study Guide`;
       }
+      if (!parsed.smartNotes || typeof parsed.smartNotes !== 'object') {
+        parsed.smartNotes = { bulletPoints: [], definitions: [], formulas: [], examples: [], examTips: [] };
+      }
+      if (!Array.isArray(parsed.smartNotes.bulletPoints)) {
+        parsed.smartNotes.bulletPoints = [`Study concept breakdown for pages ${chunk.startPage} to ${chunk.endPage}.`];
+      } else {
+        parsed.smartNotes.bulletPoints = parsed.smartNotes.bulletPoints.filter((b: any) => typeof b === 'string' && b.trim());
+        if (parsed.smartNotes.bulletPoints.length === 0) {
+          parsed.smartNotes.bulletPoints = [`Study concept breakdown for pages ${chunk.startPage} to ${chunk.endPage}.`];
+        }
+      }
+      if (!Array.isArray(parsed.smartNotes.definitions)) parsed.smartNotes.definitions = [];
+      if (!Array.isArray(parsed.smartNotes.formulas)) parsed.smartNotes.formulas = [];
+      if (!Array.isArray(parsed.smartNotes.examples)) parsed.smartNotes.examples = [];
+      if (!Array.isArray(parsed.smartNotes.examTips)) parsed.smartNotes.examTips = [];
+
+      parsed.smartNotes.definitions = parsed.smartNotes.definitions.filter((d: any) => d && typeof d === 'object' && d.term && d.definition);
+      parsed.smartNotes.formulas = parsed.smartNotes.formulas.filter((f: any) => f && typeof f === 'object' && f.formula);
+      parsed.smartNotes.examples = parsed.smartNotes.examples.filter((e: any) => e && typeof e === 'object' && e.scenario && e.solution);
+      parsed.smartNotes.examTips = parsed.smartNotes.examTips.filter((t: any) => typeof t === 'string' && t.trim());
+
+      // Clean and validate MCQs for Exam mode (preserving difficulty)
+      if (Array.isArray(parsed.mcqs)) {
+        parsed.mcqs = parsed.mcqs.map((m: any) => {
+          if (!m || typeof m !== 'object') return null;
+          const questionText = typeof m.question === 'string' ? m.question.trim() : 'Study Question';
+          let options = Array.isArray(m.options) ? m.options.map((o: any) => String(o).trim()).filter(Boolean) : [];
+          if (options.length < 2) options = ["True", "False"];
+          let correctIndex = typeof m.correctIndex === 'number' ? m.correctIndex : 0;
+          if (correctIndex < 0 || correctIndex >= options.length) correctIndex = 0;
+          const explanation = typeof m.explanation === 'string' ? m.explanation.trim() : 'Refer to the textbook page.';
+          const difficulty = typeof m.difficulty === 'string' ? m.difficulty.trim() : 'Medium';
+          return { question: questionText, options, correctIndex, explanation, difficulty };
+        }).filter(Boolean);
+      } else {
+        parsed.mcqs = [];
+      }
+
+      // Clean and validate Flashcards for Exam mode (preserving chapter)
+      if (Array.isArray(parsed.flashcards)) {
+        parsed.flashcards = parsed.flashcards.map((f: any) => {
+          if (!f || typeof f !== 'object') return null;
+          const front = typeof f.front === 'string' ? f.front.trim() : 'Concept';
+          const back = typeof f.back === 'string' ? f.back.trim() : 'Refer to details';
+          const chapter = typeof f.chapter === 'string' ? f.chapter.trim() : 'General';
+          return { front, back, chapter };
+        }).filter(Boolean);
+      } else {
+        parsed.flashcards = [];
+      }
+
+      if (!Array.isArray(parsed.importantTopics)) parsed.importantTopics = [];
+      if (!Array.isArray(parsed.pyqQuestions)) parsed.pyqQuestions = [];
+      if (!Array.isArray(parsed.mockQuestions)) parsed.mockQuestions = [];
 
       console.log(`[generateExamChunk] Chunk ${chunk.chunkIndex} completed in ${latency}. (Prompt size: ${prompt.length} chars, Response: ${cleanJson.length} chars)`);
       return parsed;
@@ -461,7 +623,23 @@ Return this exact JSON structure:
       attempt++;
       console.warn(`[generateExamChunk] Attempt ${attempt} failed for Chunk ${chunk.chunkIndex}:`, err.message);
       if (attempt > retryCount) {
-        throw new Error(`Failed to generate valid JSON chunk for pages ${chunk.startPage}-${chunk.endPage} after ${retryCount} retries. Error: ${err.message}`);
+        // Return a mock fallback exam chunk instead of throwing
+        console.warn(`[generateExamChunk] Retry limit reached, returning mock fallback for pages ${chunk.startPage}-${chunk.endPage}`);
+        return {
+          chapterTitle: `Pages ${chunk.startPage}-${chunk.endPage} (Fallback Summary)`,
+          smartNotes: {
+            bulletPoints: [`Review content in original textbook on pages ${chunk.startPage}-${chunk.endPage}.`],
+            definitions: [],
+            formulas: [],
+            examples: [],
+            examTips: []
+          },
+          importantTopics: [],
+          pyqQuestions: [],
+          mcqs: [],
+          flashcards: [],
+          mockQuestions: []
+        };
       }
     }
   }

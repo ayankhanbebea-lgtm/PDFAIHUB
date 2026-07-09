@@ -113,6 +113,7 @@ export function getSofficePath(): string | null {
   const standardPaths = [
     'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
     'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+    'C:\\Users\\ayank\\AppData\\Local\\Programs\\LibreOffice\\program\\soffice.exe',
   ];
   for (const p of standardPaths) {
     if (fs.existsSync(p)) {

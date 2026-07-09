@@ -3,10 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-
-const FREE_AI_LIMIT = 10;
-const FREE_PDF_LIMIT = 50;
-const WINDOW_MS = 24 * 60 * 60 * 1000;
+import { checkUsage } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -14,48 +11,80 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      plan: true,
-      pdfUsed: true,
-      aiUsed: true,
-      lastReset: true,
-    },
-  });
+  const timezone = request.headers.get('x-timezone') || 'UTC';
 
-  if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
-  }
+  try {
+    // Fetch live user record (plan, daily counters)
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        plan: true,
+        aiUsed: true,
+        pdfUsed: true,
+        lastReset: true,
+      },
+    });
 
-  const isPro = user.plan === 'PRO';
-  const now = Date.now();
-  const lastResetTime = new Date(user.lastReset).getTime();
-  const timeElapsed = now - lastResetTime;
-  const isExpired = timeElapsed >= WINDOW_MS;
-
-  let pdfUsed = user.pdfUsed;
-  let aiUsed = user.aiUsed;
-  let resetInMs = 0;
-
-  if (!isPro) {
-    if (isExpired) {
-      pdfUsed = 0;
-      aiUsed = 0;
-    } else {
-      resetInMs = WINDOW_MS - timeElapsed;
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-  }
 
-  return NextResponse.json({
-    plan: user.plan,
-    pdfUsed,
-    pdfLimit: isPro ? Infinity : FREE_PDF_LIMIT,
-    pdfRemaining: isPro ? Infinity : Math.max(0, FREE_PDF_LIMIT - pdfUsed),
-    aiUsed,
-    aiLimit: isPro ? Infinity : FREE_AI_LIMIT,
-    aiRemaining: isPro ? Infinity : Math.max(0, FREE_AI_LIMIT - aiUsed),
-    resetInMs,
-    lastReset: user.lastReset,
-  });
+    const plan = user.plan;
+    const isPro = plan === 'PRO';
+
+    // Timezone-aware daily reset check
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    });
+    const todayStr = formatter.format(now);
+    const lastResetStr = formatter.format(new Date(user.lastReset));
+    const isNewDay = todayStr !== lastResetStr;
+
+    // If day has changed, daily counters are logically 0 (reset not yet triggered in DB)
+    const aiUsedToday = isNewDay ? 0 : user.aiUsed;
+    const pdfUsedToday = isNewDay ? 0 : user.pdfUsed;
+
+    if (isPro) {
+      // Pro users: return real usage for analytics, never show limits
+      const resetInMs = 0; // Pro users don't reset
+      return NextResponse.json({
+        plan,
+        isPro: true,
+        // Daily AI usage (today's actual requests)
+        aiUsed: aiUsedToday,
+        aiLimit: null,         // null = unlimited
+        aiRemaining: null,     // null = unlimited
+        // Daily PDF usage
+        pdfUsed: pdfUsedToday,
+        pdfLimit: null,
+        pdfRemaining: null,
+        resetInMs,
+      });
+    }
+
+    // Free user — enforce limits
+    const aiUsage = await checkUsage(session.user.id, 'ai', timezone);
+    const pdfUsage = await checkUsage(session.user.id, 'pdf', timezone);
+
+    const aiRemaining = aiUsage.remaining;
+    const pdfRemaining = pdfUsage.remaining;
+
+    return NextResponse.json({
+      plan,
+      isPro: false,
+      aiUsed: aiUsedToday,
+      aiLimit: 5,
+      aiRemaining,
+      aiLocked: aiRemaining <= 0,   // UI uses this to render lock wall
+      pdfUsed: pdfUsedToday,
+      pdfLimit: 50,
+      pdfRemaining,
+      resetInMs: Math.max(aiUsage.resetInMs, pdfUsage.resetInMs),
+    });
+  } catch (error: any) {
+    console.error('[usage] Error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to fetch usage' }, { status: 500 });
+  }
 }

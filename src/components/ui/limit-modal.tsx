@@ -23,7 +23,7 @@ export function LimitModal({ isOpen, onClose, type, resetInMs }: LimitModalProps
 
   const limitText = type === 'pdf' 
     ? "You've reached your free limit of 50 PDF operations. Your limit will reset 24 hours after your first PDF operation, or upgrade to Pro for unlimited usage."
-    : "You've used all 10 free AI requests. Upgrade to Pro for unlimited AI features, or wait until your 24-hour limit resets.";
+    : "You've used all 5 free AI requests for today.\nUpgrade to Pro for unlimited AI usage.";
 
   return (
     <AnimatePresence>
@@ -90,7 +90,7 @@ export function LimitModal({ isOpen, onClose, type, resetInMs }: LimitModalProps
               onClick={onClose}
               className="w-full py-3 text-center rounded-xl border border-border text-foreground font-medium hover:bg-secondary transition-colors cursor-pointer"
             >
-              Wait for Reset
+              {type === 'ai' ? 'Come Back Tomorrow' : 'Wait for Reset'}
             </button>
           </div>
         </motion.div>

@@ -17,6 +17,7 @@ interface FileDropzoneProps {
   files: File[];
   showPreview?: boolean;
   allowReorder?: boolean;
+  disabled?: boolean;
 }
 
 export function FileDropzone({
@@ -29,6 +30,7 @@ export function FileDropzone({
   sublabel,
   files,
   showPreview = true,
+  disabled = false,
 }: FileDropzoneProps) {
   const [error, setError] = useState<string>('');
 
@@ -66,6 +68,7 @@ export function FileDropzone({
     maxFiles: multiple ? maxFiles : 1,
     maxSize: maxSizeMB * 1024 * 1024,
     multiple,
+    disabled,
   });
 
   const removeFile = (index: number) => {

@@ -39,6 +39,6 @@ export async function GET(
     return NextResponse.json({ success: true, examPackage: pkg });
   } catch (error: any) {
     console.error('[ai-exam-single] error:', error);
-    return NextResponse.json({ error: 'Failed to load exam package' }, { status: 500 });
+    return NextResponse.json({ error: 'We encountered an issue loading this exam package. Please try again.' }, { status: 500 });
   }
 }

@@ -11,12 +11,14 @@ import {
   HelpCircle, Eye, RefreshCw, BarChart, History, ChevronRight, FileText, Check, X,
   Download, Menu, Activity, ShieldAlert, Award, FileSpreadsheet, List, HelpCircle as HelpIcon
 } from 'lucide-react';
-import { ToolLayout } from '@/components/tools/tool-layout';
+import { ToolLayout, useToolUsage } from '@/components/tools/tool-layout';
 import { FileDropzone } from '@/components/tools/file-dropzone';
 
 export default function AIExamModePage() {
   const { data: session } = useSession();
   const isProUser = session?.user?.plan === 'PRO';
+
+  const toolUsage = useToolUsage();
 
   // Files & generation states
   const [files, setFiles] = useState<File[]>([]);
@@ -95,6 +97,10 @@ export default function AIExamModePage() {
   // Start package generation
   const handleGenerate = async () => {
     if (!files[0]) return toast.error('Please upload a PDF first');
+    if (toolUsage?.isLimitReached) {
+      toolUsage.setShowUpgradeModal(true);
+      return;
+    }
 
     setLoading(true);
     setExamPackage(null);
@@ -115,12 +121,18 @@ export default function AIExamModePage() {
 
       const response = await fetch('/api/ai/exam', {
         method: 'POST',
+        headers: {
+          'x-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone
+        },
         body: formData,
       });
 
       if (!response.ok) {
+        if (response.status === 403 || response.status === 429) {
+          toolUsage?.setShowUpgradeModal(true);
+        }
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Failed with status ${response.status}`);
+        throw new Error(errData.message || errData.error || `Failed with status ${response.status}`);
       }
 
       if (!response.body) {
@@ -329,6 +341,8 @@ export default function AIExamModePage() {
   return (
     <ToolLayout
       requiresAuth={true}
+      isPro={true}
+      isAI={true}
       title="AI Exam Mode"
       description="Process textbook chapters to generate smart notes, topics weightage, PYQs, mock papers, interactive flashcards, and difficulty analysis."
       icon="🎓"
@@ -378,10 +392,23 @@ export default function AIExamModePage() {
 
                 <button
                   onClick={handleGenerate}
-                  className="btn-brand bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-none text-white w-full py-4 rounded-xl text-base font-bold shadow-lg shadow-amber-500/10 cursor-pointer flex items-center justify-center gap-2 transition-all hover:scale-[1.01]"
+                  className={`w-full py-4 rounded-xl text-base font-bold shadow-lg cursor-pointer flex items-center justify-center gap-2 transition-all hover:scale-[1.01] ${
+                    toolUsage?.isLimitReached
+                      ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30'
+                      : 'btn-brand bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-none text-white shadow-amber-500/10'
+                  }`}
                 >
-                  <Sparkles className="w-5 h-5 animate-pulse" />
-                  Generate Exam Package
+                  {toolUsage?.isLimitReached ? (
+                    <>
+                      <Sparkles className="w-5 h-5 animate-pulse" />
+                      Upgrade to Pro to Generate
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-5 h-5 animate-pulse" />
+                      Generate Exam Package
+                    </>
+                  )}
                 </button>
               </div>
             )}

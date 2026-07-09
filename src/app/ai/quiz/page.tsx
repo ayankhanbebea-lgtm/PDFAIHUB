@@ -5,7 +5,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { Sparkles, CheckCircle, XCircle, RotateCcw, Trophy } from 'lucide-react';
-import { ToolLayout } from '@/components/tools/tool-layout';
+import { ToolLayout, useToolUsage } from '@/components/tools/tool-layout';
 import { FileDropzone } from '@/components/tools/file-dropzone';
 import type { QuizQuestion } from '@/types';
 
@@ -17,8 +17,14 @@ export default function QuizPage() {
   const [submitted, setSubmitted] = useState(false);
   const [count, setCount] = useState(10);
 
+  const toolUsage = useToolUsage();
+
   const handleGenerate = async () => {
     if (!files[0]) return toast.error('Upload a PDF first');
+    if (toolUsage?.isLimitReached) {
+      toolUsage.setShowUpgradeModal(true);
+      return;
+    }
 
     setLoading(true);
     setQuestions([]);
@@ -30,11 +36,18 @@ export default function QuizPage() {
       formData.append('file', files[0]);
       formData.append('count', count.toString());
 
-      const { data } = await axios.post('/api/ai/quiz', formData);
+      const { data } = await axios.post('/api/ai/quiz', formData, {
+        headers: {
+          'x-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone
+        }
+      });
       setQuestions(data.questions);
       toast.success(`${data.questions.length} questions generated!`);
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to generate quiz');
+      if (err.response?.status === 403 || err.response?.status === 429) {
+        toolUsage?.setShowUpgradeModal(true);
+      }
+      toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to generate quiz');
     } finally {
       setLoading(false);
     }
@@ -98,9 +111,25 @@ export default function QuizPage() {
                     className="w-full accent-primary"
                   />
                 </div>
-                <button onClick={handleGenerate} className="btn-brand w-full py-3.5 flex items-center justify-center gap-2 cursor-pointer">
-                  <Sparkles className="w-4 h-4" />
-                  Generate {count} Questions
+                <button
+                  onClick={handleGenerate}
+                  className={`w-full py-3.5 flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                    toolUsage?.isLimitReached
+                      ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-xl font-semibold'
+                      : 'btn-brand'
+                  }`}
+                >
+                  {toolUsage?.isLimitReached ? (
+                    <>
+                      <Sparkles className="w-4 h-4 animate-pulse" />
+                      Upgrade to Pro to Generate
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Generate {count} Questions
+                    </>
+                  )}
                 </button>
               </div>
             )}

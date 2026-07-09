@@ -5,25 +5,19 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { generateFlashcards } from '@/lib/ai';
 import { extractTextFromPDF } from '@/lib/pdf-ai';
-import { checkUsage, incrementUsage, logUsage } from '@/lib/rate-limit';
+import { checkAiAccess } from '@/lib/ai-access';
+import { incrementUsage, logUsage } from '@/lib/rate-limit';
 import prisma from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const usage = await checkUsage(session.user.id, 'ai');
-  if (!usage.allowed) {
-    return NextResponse.json(
-      { error: "You've used all 10 free AI requests. Upgrade to Pro for unlimited AI features, or wait until your 24-hour limit resets.", upgrade: true },
-      { status: 429 }
-    );
-  }
+  // ── ACCESS GUARD ─────────────────────────────────────────────────────────────
+  const access = await checkAiAccess(request);
+  if (!access.allowed) return access.response;
+  const { userId, usage, timezone } = access;
+  // ─────────────────────────────────────────────────────────────────────────────
 
   try {
     const formData = await request.formData();
@@ -48,14 +42,16 @@ export async function POST(request: NextRequest) {
 
     const flashcardSet = await prisma.flashcard.create({
       data: {
-        userId: session.user.id,
+        userId,
         title: `Flashcards: ${file.name}`,
         cards: cards as unknown as any,
       },
     });
 
-    await incrementUsage(session.user.id, 'ai');
-    await logUsage(session.user.id, 'ai_flashcards', { cardCount: cards.length });
+    // ── Consume one AI request (after success) ────────────────────────────────
+    await incrementUsage(userId, 'ai', timezone);
+    await logUsage(userId, 'ai_flashcards', { cardCount: cards.length });
+    // ─────────────────────────────────────────────────────────────────────────
 
     return NextResponse.json({
       success: true,
@@ -67,7 +63,7 @@ export async function POST(request: NextRequest) {
     console.error('[flashcards] FULL ERROR:', error);
     console.error('[flashcards] Stack:', error?.stack);
     return NextResponse.json({
-      error: 'Failed to generate flashcards',
+      error: 'We encountered a temporary processing issue. Please try again.',
       detail: process.env.NODE_ENV === 'development' ? error?.message : undefined,
     }, { status: 500 });
   }

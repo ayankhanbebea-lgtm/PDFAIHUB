@@ -1,9 +1,60 @@
 // src/lib/rate-limit.ts
 import prisma from './prisma';
 
-const FREE_AI_LIMIT = 10;
+const FREE_AI_LIMIT = 5;
 const FREE_PDF_LIMIT = 50;
-const WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function getLocalDateString(date: Date, timezone: string = 'UTC'): string {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    return formatter.format(date); // Returns YYYY-MM-DD
+  } catch (e) {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'UTC',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    return formatter.format(date);
+  }
+}
+
+function getMsUntilNextMidnight(timezone: string = 'UTC'): number {
+  try {
+    const now = new Date();
+    
+    // Get parts for the current time in the user's timezone
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hour12: false
+    });
+    
+    const parts = formatter.formatToParts(now);
+    const partsMap = Object.fromEntries(parts.map(p => [p.type, p.value]));
+    
+    const pad = (v: string | undefined) => (v || '0').padStart(2, '0');
+    const tzOffsetDateStr = `${partsMap.year}-${pad(partsMap.month)}-${pad(partsMap.day)}T00:00:00`;
+    
+    const localMidnightToday = new Date(new Date(tzOffsetDateStr).toLocaleString('en-US', { timeZone: timezone }));
+    const tomorrowMidnight = new Date(localMidnightToday.getTime() + 24 * 60 * 60 * 1000);
+    
+    const ms = tomorrowMidnight.getTime() - now.getTime();
+    return ms > 0 ? ms : 24 * 60 * 60 * 1000;
+  } catch (e) {
+    return 24 * 60 * 60 * 1000;
+  }
+}
 
 export interface UsageStatus {
   allowed: boolean;
@@ -41,7 +92,8 @@ async function verifyActiveProSubscription(userId: string, currentPlan: string):
 // Check if the user is allowed to perform the operation (read-only)
 export async function checkUsage(
   userId: string,
-  type: 'ai' | 'pdf'
+  type: 'ai' | 'pdf',
+  timezone: string = 'UTC'
 ): Promise<UsageStatus> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -62,26 +114,26 @@ export async function checkUsage(
     return { allowed: true, remaining: Infinity, limit: Infinity, resetInMs: 0 };
   }
 
-  const now = Date.now();
-  const lastResetTime = new Date(user.lastReset).getTime();
-  const timeElapsed = now - lastResetTime;
-  const isExpired = timeElapsed >= WINDOW_MS;
+  const now = new Date();
+  const currentDateStr = getLocalDateString(now, timezone);
+  const lastResetDateStr = getLocalDateString(new Date(user.lastReset), timezone);
+  const isExpired = currentDateStr !== lastResetDateStr;
 
   const limit = type === 'ai' ? FREE_AI_LIMIT : FREE_PDF_LIMIT;
 
   if (isExpired) {
-    // If the 24h window has passed, the user is fully reset
+    // If the day has changed, the user is fully reset
     return {
       allowed: true,
       remaining: limit,
       limit,
-      resetInMs: 0,
+      resetInMs: getMsUntilNextMidnight(timezone),
     };
   }
 
   const currentUsed = type === 'ai' ? user.aiUsed : user.pdfUsed;
   const remaining = Math.max(0, limit - currentUsed);
-  const resetInMs = Math.max(0, WINDOW_MS - timeElapsed);
+  const resetInMs = getMsUntilNextMidnight(timezone);
 
   return {
     allowed: remaining > 0,
@@ -92,9 +144,12 @@ export async function checkUsage(
 }
 
 // Increment usage ONLY after successful operations
+// For FREE users: enforces daily limits.
+// For PRO users: still increments for analytics — never blocked.
 export async function incrementUsage(
   userId: string,
-  type: 'ai' | 'pdf'
+  type: 'ai' | 'pdf',
+  timezone: string = 'UTC'
 ): Promise<UsageStatus> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -109,33 +164,29 @@ export async function incrementUsage(
   if (!user) throw new Error('User not found');
 
   const resolvedPlan = await verifyActiveProSubscription(userId, user.plan);
+  const isPro = resolvedPlan === 'PRO';
+  const limit = type === 'ai' ? FREE_AI_LIMIT : FREE_PDF_LIMIT;
 
   const now = new Date();
-  const lastResetTime = new Date(user.lastReset).getTime();
-  const timeElapsed = now.getTime() - lastResetTime;
-  const isExpired = timeElapsed >= WINDOW_MS;
+  const currentDateStr = getLocalDateString(now, timezone);
+  const lastResetDateStr = getLocalDateString(new Date(user.lastReset), timezone);
+  const isExpired = currentDateStr !== lastResetDateStr;
 
   let newPdfUsed = user.pdfUsed;
   let newAiUsed = user.aiUsed;
   let newLastReset = new Date(user.lastReset);
 
   if (isExpired) {
-    // Window expired: Reset both counters and start a new 24h window now
+    // Window expired: Reset daily counters and start a new window
     newPdfUsed = type === 'pdf' ? 1 : 0;
     newAiUsed = type === 'ai' ? 1 : 0;
     newLastReset = now;
   } else {
-    // Active window: Increment the specific usage
-    const isFirstUsageInWindow = user.pdfUsed === 0 && user.aiUsed === 0;
-
+    // Same day: always increment (both Free and Pro)
     if (type === 'pdf') {
       newPdfUsed += 1;
     } else {
       newAiUsed += 1;
-    }
-
-    if (isFirstUsageInWindow) {
-      newLastReset = now;
     }
   }
 
@@ -148,19 +199,23 @@ export async function incrementUsage(
     },
   });
 
-  const isPro = resolvedPlan === 'PRO';
-  const limit = type === 'ai' ? FREE_AI_LIMIT : FREE_PDF_LIMIT;
+  if (isPro) {
+    // Pro users: unlimited, just return status for the response
+    return { allowed: true, remaining: Infinity, limit: Infinity, resetInMs: 0 };
+  }
+
   const currentUsed = type === 'ai' ? newAiUsed : newPdfUsed;
-  const remaining = isPro ? Infinity : Math.max(0, limit - currentUsed);
-  const resetInMs = isPro ? 0 : Math.max(0, WINDOW_MS - (now.getTime() - newLastReset.getTime()));
+  const remaining = Math.max(0, limit - currentUsed);
+  const resetInMs = getMsUntilNextMidnight(timezone);
 
   return {
     allowed: true,
     remaining,
-    limit: isPro ? Infinity : limit,
+    limit,
     resetInMs,
   };
 }
+
 
 export async function logUsage(
   userId: string,

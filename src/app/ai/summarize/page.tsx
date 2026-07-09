@@ -5,7 +5,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, BookOpen, List, HelpCircle, FileText, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
-import { ToolLayout } from '@/components/tools/tool-layout';
+import { ToolLayout, useToolUsage } from '@/components/tools/tool-layout';
 import { FileDropzone } from '@/components/tools/file-dropzone';
 import type { AISummary } from '@/types';
 
@@ -69,8 +69,14 @@ export default function SummarizePage() {
   const [summary, setSummary] = useState<AISummary | null>(null);
   const [provider, setProvider] = useState<'openai' | 'gemini' | 'groq'>('groq');
 
+  const toolUsage = useToolUsage();
+
   const handleSummarize = async () => {
     if (!files[0]) return toast.error('Please upload a PDF');
+    if (toolUsage?.isLimitReached) {
+      toolUsage.setShowUpgradeModal(true);
+      return;
+    }
 
     setLoading(true);
     setSummary(null);
@@ -80,11 +86,18 @@ export default function SummarizePage() {
       formData.append('file', files[0]);
       formData.append('provider', provider);
 
-      const { data } = await axios.post('/api/ai/summarize', formData);
+      const { data } = await axios.post('/api/ai/summarize', formData, {
+        headers: {
+          'x-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone
+        }
+      });
       setSummary(data.summary);
       toast.success('Summary generated!');
     } catch (err: any) {
-      const msg = err.response?.data?.error || 'Failed to generate summary';
+      if (err.response?.status === 403 || err.response?.status === 429) {
+        toolUsage?.setShowUpgradeModal(true);
+      }
+      const msg = err.response?.data?.message || err.response?.data?.error || 'Failed to generate summary';
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -136,9 +149,23 @@ export default function SummarizePage() {
         />
 
         {files.length > 0 && !loading && !summary && (
-          <button onClick={handleSummarize} className="btn-brand w-full py-3.5 flex items-center justify-center gap-2 cursor-pointer">
-            <Sparkles className="w-4 h-4" />
-            Generate AI Summary
+          <button
+            onClick={handleSummarize}
+            className={`w-full py-3.5 flex items-center justify-center gap-2 cursor-pointer transition-all ${
+              toolUsage?.isLimitReached
+                ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-xl font-semibold'
+                : 'btn-brand'
+            }`}
+          >
+            {toolUsage?.isLimitReached ? (
+              <>
+                <Sparkles className="w-4 h-4" /> Upgrade to Pro to Generate
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" /> Generate AI Summary
+              </>
+            )}
           </button>
         )}
 

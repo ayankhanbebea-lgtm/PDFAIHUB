@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Bot, User, FileText, RefreshCw } from 'lucide-react';
-import { ToolLayout } from '@/components/tools/tool-layout';
+import { Send, Bot, User, FileText, RefreshCw, Sparkles } from 'lucide-react';
+import { ToolLayout, useToolUsage } from '@/components/tools/tool-layout';
 import { FileDropzone } from '@/components/tools/file-dropzone';
 import ReactMarkdown from 'react-markdown';
 
@@ -24,12 +24,18 @@ export default function AIChat() {
   const [pdfReady, setPdfReady] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const toolUsage = useToolUsage();
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const startSession = async () => {
     if (!files[0]) return toast.error('Upload a PDF first');
+    if (toolUsage?.isLimitReached) {
+      toolUsage.setShowUpgradeModal(true);
+      return;
+    }
 
     setUploadingPDF(true);
     try {
@@ -37,13 +43,20 @@ export default function AIChat() {
       formData.append('file', files[0]);
       formData.append('question', 'Hello! Please briefly introduce what this document is about.');
 
-      const { data } = await axios.post('/api/ai/chat', formData);
+      const { data } = await axios.post('/api/ai/chat', formData, {
+        headers: {
+          'x-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone
+        }
+      });
       setSessionId(data.sessionId);
       setPdfReady(true);
       setMessages([{ role: 'assistant', content: data.answer }]);
       toast.success('PDF ready! Start asking questions.');
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to process PDF');
+      if (err.response?.status === 403 || err.response?.status === 429) {
+        toolUsage?.setShowUpgradeModal(true);
+      }
+      toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to process PDF');
     } finally {
       setUploadingPDF(false);
     }
@@ -51,6 +64,10 @@ export default function AIChat() {
 
   const sendMessage = async () => {
     if (!input.trim() || loading || !sessionId) return;
+    if (toolUsage?.isLimitReached) {
+      toolUsage.setShowUpgradeModal(true);
+      return;
+    }
 
     const userMessage = input.trim();
     setInput('');
@@ -62,10 +79,17 @@ export default function AIChat() {
       formData.append('question', userMessage);
       formData.append('sessionId', sessionId);
 
-      const { data } = await axios.post('/api/ai/chat', formData);
+      const { data } = await axios.post('/api/ai/chat', formData, {
+        headers: {
+          'x-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone
+        }
+      });
       setMessages((prev) => [...prev, { role: 'assistant', content: data.answer }]);
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to get answer');
+      if (err.response?.status === 403 || err.response?.status === 429) {
+        toolUsage?.setShowUpgradeModal(true);
+      }
+      toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to get answer');
       setMessages((prev) => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }]);
     } finally {
       setLoading(false);
@@ -99,12 +123,21 @@ export default function AIChat() {
             <button
               onClick={startSession}
               disabled={uploadingPDF}
-              className="btn-brand w-full py-3.5 flex items-center justify-center gap-2 cursor-pointer"
+              className={`w-full py-3.5 flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                toolUsage?.isLimitReached
+                  ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-xl font-semibold'
+                  : 'btn-brand'
+              }`}
             >
               {uploadingPDF ? (
                 <>
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   Processing PDF...
+                </>
+              ) : toolUsage?.isLimitReached ? (
+                <>
+                  <Sparkles className="w-4 h-4 animate-pulse" />
+                  Upgrade to Pro to Chat
                 </>
               ) : (
                 <>

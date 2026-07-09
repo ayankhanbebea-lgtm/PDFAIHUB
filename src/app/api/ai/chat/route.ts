@@ -5,7 +5,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { chatWithPDF } from '@/lib/ai';
 import { extractTextFromPDF } from '@/lib/pdf-ai';
-import { checkUsage, incrementUsage, logUsage } from '@/lib/rate-limit';
+import { checkAiAccess } from '@/lib/ai-access';
+import { incrementUsage, logUsage } from '@/lib/rate-limit';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { priorityScheduler } from '@/lib/priority-queue';
 import prisma from '@/lib/prisma';
@@ -14,18 +15,11 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Sign in required' }, { status: 401 });
-  }
-
-  const usage = await checkUsage(session.user.id, 'ai');
-  if (!usage.allowed) {
-    return NextResponse.json(
-      { error: "You've used all 10 free AI requests. Upgrade to Pro for unlimited AI features, or wait until your 24-hour limit resets.", upgrade: true },
-      { status: 429 }
-    );
-  }
+  // ── ACCESS GUARD ─────────────────────────────────────────────────────────────
+  const access = await checkAiAccess(request);
+  if (!access.allowed) return access.response;
+  const { userId, isPro, usage, timezone } = access;
+  // ─────────────────────────────────────────────────────────────────────────────
 
   try {
     const formData = await request.formData();
@@ -33,9 +27,6 @@ export async function POST(request: NextRequest) {
     const question = formData.get('question') as string;
     const sessionId = formData.get('sessionId') as string | null;
     const provider = (formData.get('provider') as 'openai' | 'gemini' | 'groq') || 'groq';
-    
-    // Check for pro status (assuming standard user object structure)
-    const isPro = (session.user as any)?.plan === 'PRO';
 
     console.log(`[chat] Request — question: ${question?.slice(0,50)}, sessionId: ${sessionId}, provider: ${provider}, hasFile: ${!!file}`);
 
@@ -52,7 +43,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Valid PDF required' }, { status: 400 });
       }
       const buffer = Buffer.from(await file.arrayBuffer());
-      
+
       pdfContent = await priorityScheduler.enqueue(async () => {
         return extractTextFromPDF(buffer);
       }, isPro);
@@ -69,7 +60,7 @@ export async function POST(request: NextRequest) {
       if (cloudinaryConfigured) {
         try {
           const uploaded = await uploadToCloudinary(buffer, {
-            folder: `pdfai-hub/${session.user.id}/chat`,
+            folder: `pdfai-hub/${userId}/chat`,
             resourceType: 'raw',
             format: 'pdf',
           });
@@ -82,7 +73,7 @@ export async function POST(request: NextRequest) {
 
       const newSession = await prisma.chatSession.create({
         data: {
-          userId: session.user.id,
+          userId,
           fileName: file.name,
           title: `Chat: ${file.name}`,
           pdfText: pdfContent.slice(0, 50000),
@@ -92,7 +83,7 @@ export async function POST(request: NextRequest) {
 
       await prisma.file.create({
         data: {
-          userId: session.user.id,
+          userId,
           name: file.name,
           originalName: file.name,
           size: buffer.length,
@@ -106,7 +97,7 @@ export async function POST(request: NextRequest) {
       });
     } else if (sessionId) {
       const existingSession = await prisma.chatSession.findUnique({
-        where: { id: sessionId, userId: session.user.id },
+        where: { id: sessionId, userId },
         include: { messages: { orderBy: { createdAt: 'asc' }, take: 20 } },
       });
       if (!existingSession) {
@@ -137,15 +128,22 @@ export async function POST(request: NextRequest) {
       ],
     });
 
-    await incrementUsage(session.user.id, 'ai');
-    await logUsage(session.user.id, 'ai_chat');
+    // ── Consume one AI request (after success) ────────────────────────────────
+    await incrementUsage(userId, 'ai', timezone);
+    await logUsage(userId, 'ai_chat');
+    // ─────────────────────────────────────────────────────────────────────────
 
-    return NextResponse.json({ success: true, sessionId: chatSessionId, answer, remaining: usage.remaining - 1 });
+    return NextResponse.json({
+      success: true,
+      sessionId: chatSessionId,
+      answer,
+      remaining: usage.remaining - 1,
+    });
   } catch (error: any) {
     console.error('[chat] FULL ERROR:', error);
     console.error('[chat] Stack:', error?.stack);
     return NextResponse.json({
-      error: 'Failed to process question',
+      error: 'I could not generate an answer at this moment. Please try again.',
       detail: process.env.NODE_ENV === 'development' ? error?.message : undefined,
     }, { status: 500 });
   }
