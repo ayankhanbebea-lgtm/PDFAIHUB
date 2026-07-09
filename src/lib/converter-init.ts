@@ -222,9 +222,14 @@ export async function initConversionEngine(force = false): Promise<ConverterStat
       const pdfPath = path.join(testDir, 'test-excel.pdf');
       
       if (libreOfficePath) {
-        fs.writeFileSync(xlsxPath, 'Excel self-test data');
+        const csvPath = path.join(testDir, 'test.csv');
+        fs.writeFileSync(csvPath, 'Col1,Col2\nVal1,Val2');
         const cmd = `"${libreOfficePath}"`;
-        await execWithTimeout(`${cmd} --headless --convert-to pdf --outdir "${testDir}" "${xlsxPath}"`, 20000);
+        await execWithTimeout(`${cmd} --headless --convert-to pdf --outdir "${testDir}" "${csvPath}"`, 20000);
+        const defaultPdf = path.join(testDir, 'test.pdf');
+        if (fs.existsSync(defaultPdf)) {
+          fs.renameSync(defaultPdf, pdfPath);
+        }
       } else if (excelCOMReady) {
         const script = `
           $excel = New-Object -ComObject Excel.Application
@@ -257,9 +262,14 @@ export async function initConversionEngine(force = false): Promise<ConverterStat
       const pdfPath = path.join(testDir, 'test-ppt.pdf');
 
       if (libreOfficePath) {
-        fs.writeFileSync(pptxPath, 'PowerPoint self-test data');
+        const txtPath = path.join(testDir, 'test.txt');
+        fs.writeFileSync(txtPath, 'PowerPoint self-test data');
         const cmd = `"${libreOfficePath}"`;
-        await execWithTimeout(`${cmd} --headless --convert-to pdf --outdir "${testDir}" "${pptxPath}"`, 20000);
+        await execWithTimeout(`${cmd} --headless --convert-to pdf --outdir "${testDir}" "${txtPath}"`, 20000);
+        const defaultPdf = path.join(testDir, 'test.pdf');
+        if (fs.existsSync(defaultPdf)) {
+          fs.renameSync(defaultPdf, pdfPath);
+        }
       } else if (powerpointCOMReady) {
         const script = `
           $ppt = New-Object -ComObject PowerPoint.Application

@@ -49,16 +49,22 @@ export async function POST(request: NextRequest) {
     let sharp: any;
     try { sharp = (await import('sharp')).default; } catch {}
 
-    const imageBuffers = await Promise.all(
-      orderedFiles.map(async (file) => {
-        let buffer = Buffer.from(await file.arrayBuffer());
-        if (file.type === 'image/webp' && sharp) {
-          buffer = await sharp(buffer).jpeg({ quality: 90 }).toBuffer();
-          return { buffer, mimeType: 'image/jpeg' };
-        }
-        return { buffer, mimeType: file.type };
-      })
-    );
+    const imageBuffers: Array<{ buffer: Buffer; mimeType: string }> = [];
+    const batchSize = 8;
+    for (let i = 0; i < orderedFiles.length; i += batchSize) {
+      const batch = orderedFiles.slice(i, i + batchSize);
+      const batchResults = await Promise.all(
+        batch.map(async (file) => {
+          let buffer = Buffer.from(await file.arrayBuffer());
+          if (file.type === 'image/webp' && sharp) {
+            buffer = await sharp(buffer).jpeg({ quality: 90 }).toBuffer();
+            return { buffer, mimeType: 'image/jpeg' };
+          }
+          return { buffer, mimeType: file.type };
+        })
+      );
+      imageBuffers.push(...batchResults);
+    }
 
     const pdfBuffer = await imagesToPDF(imageBuffers);
 

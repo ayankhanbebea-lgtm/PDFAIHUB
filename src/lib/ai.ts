@@ -85,25 +85,27 @@ export async function generateSummary(
   text: string,
   provider: string = 'groq'
 ): Promise<AISummary> {
-  const systemPrompt = `You are an expert academic assistant. Analyze the provided text and generate structured study content.
-Always respond with valid JSON only — no markdown, no code fences, no backticks. Raw JSON only.`;
+  const systemPrompt = `You are an expert academic assistant. Analyze the text and generate structured study content.
+Always respond with valid JSON only. Raw JSON only, no markdown code fences.`;
 
-  const prompt = `Analyze this text and return this exact JSON structure (raw JSON, no code blocks):
+  const prompt = `Analyze this text:
+---
+${text.slice(0, 6000)}
+---
 
-Text: ${text.slice(0, 8000)}
-
+Return JSON:
 {
   "shortSummary": "2-3 sentence overview",
-  "detailedSummary": "Comprehensive 5-8 paragraph analysis",
-  "keyPoints": ["point 1", "point 2", "point 3", "point 4", "point 5"],
-  "examRevisionNotes": "Structured revision notes with key concepts",
-  "importantQuestions": ["question 1", "question 2", "question 3", "question 4", "question 5"]
+  "detailedSummary": "5-8 paragraph analysis",
+  "keyPoints": ["5 key points"],
+  "examRevisionNotes": "Revision notes",
+  "importantQuestions": ["5 questions"]
 }`;
 
-  const response = await generateWithAI(prompt, systemPrompt, provider);
+  const response = await generateWithAIWithBackoff(prompt, systemPrompt, provider);
 
   try {
-    const cleaned = response.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    const cleaned = repairJson(response);
     return JSON.parse(cleaned) as AISummary;
   } catch {
     return {

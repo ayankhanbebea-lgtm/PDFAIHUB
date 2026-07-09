@@ -40,6 +40,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'PDF must be under 20MB' }, { status: 400 });
     }
 
+    // Check if same file was already summarized (Token Optimization: Local Cache)
+    const existingFile = await prisma.file.findFirst({
+      where: {
+        userId: session.user.id,
+        name: file.name,
+        size: file.size,
+        tool: 'summarize',
+        status: 'COMPLETED',
+      },
+    });
+
+    if (existingFile && existingFile.metadata) {
+      const meta = existingFile.metadata as any;
+      if (meta.summary) {
+        console.log(`[summarize] Cache hit for ${file.name} (${file.size} bytes). Returning cached summary.`);
+        return NextResponse.json({
+          success: true,
+          summary: meta.summary,
+          fileId: existingFile.id,
+          remaining: usage.remaining,
+        });
+      }
+    }
+
     const isPro = session.user.plan === 'PRO';
     const buffer = Buffer.from(await file.arrayBuffer());
     
@@ -95,7 +119,7 @@ export async function POST(request: NextRequest) {
         publicId,
         tool: 'summarize',
         status: 'COMPLETED',
-        metadata: { summaryGenerated: true, provider },
+        metadata: { summaryGenerated: true, provider, summary },
       },
     });
 
@@ -105,9 +129,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, summary, fileId: fileRecord.id, remaining: usage.remaining - 1 });
   } catch (error: any) {
     console.error('[summarize] ERROR:', error.message);
-    console.error('[summarize] STACK:', error.stack);
+    const friendlyMsg = error.message?.includes('429') || error.message?.includes('rate limit')
+      ? 'AI is currently busy. Switching to another AI model...'
+      : 'Failed to generate summary due to a temporary processing issue. Please try again.';
     return NextResponse.json({
-      error: error.message || 'Failed to generate summary',
+      error: friendlyMsg,
     }, { status: 500 });
   }
 }

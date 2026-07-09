@@ -47,13 +47,13 @@ export async function POST(request: NextRequest) {
 
     // Ensure conversion engine status is loaded
     let status = getConverterStatus();
-    if (!status) {
-      status = await initConversionEngine();
+    if (!status || status.libreOfficeStatus === 'MISSING') {
+      status = await initConversionEngine(true);
     }
 
     if (status.libreOfficeStatus === 'MISSING') {
       return NextResponse.json({
-        error: 'PDF/A conversion is temporarily unavailable. Please try again later.',
+        error: 'PDF/A conversion is temporarily unavailable. Please verify LibreOffice is installed on the server host.',
         logs: status.errorLogs
       }, { status: 503 });
     }

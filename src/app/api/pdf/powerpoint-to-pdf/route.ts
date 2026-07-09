@@ -15,6 +15,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
+  const uploadStart = performance.now();
   const session = await getServerSession(authOptions);
 
   if (session?.user?.id) {
@@ -47,8 +48,8 @@ export async function POST(request: NextRequest) {
 
     // Ensure conversion engine status is loaded
     let status = getConverterStatus();
-    if (!status) {
-      status = await initConversionEngine();
+    if (!status || (status.libreOfficeStatus === 'MISSING' && !status.powerpointCOMReady)) {
+      status = await initConversionEngine(true);
     }
 
     if (status.libreOfficeStatus === 'MISSING' && !status.powerpointCOMReady) {
@@ -68,10 +69,16 @@ export async function POST(request: NextRequest) {
     fs.writeFileSync(inputPath, buffer);
     tempFiles.push(inputPath);
 
-    // Convert PPT to PDF using LibreOffice
+    const uploadDuration = Math.round(performance.now() - uploadStart);
+
+    // Convert PPT to PDF using LibreOffice / COM
+    const conversionStart = performance.now();
     const pdfPath = await convertToPDF(inputPath, tempDir);
     tempFiles.push(pdfPath);
+    const conversionDuration = Math.round(performance.now() - conversionStart);
 
+    // PDF Generation / Save / Read Buffer
+    const generationStart = performance.now();
     const pdfBuffer = fs.readFileSync(pdfPath);
 
     if (session?.user?.id) {
@@ -92,6 +99,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const pdfGenerationDuration = Math.round(performance.now() - generationStart);
+
+    // PrintTimingLogs
+    console.log(`[powerpoint-to-pdf] Timings:
+    - Upload: ${uploadDuration}ms
+    - Conversion: ${conversionDuration}ms
+    - PDF Generation & Save: ${pdfGenerationDuration}ms`);
+
     const outputName = `${file.name.replace(/\.(ppt|pptx)$/i, '')}.pdf`;
 
     return new Response(new Uint8Array(pdfBuffer), {
@@ -100,6 +115,10 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${outputName}"`,
         'Content-Length': String(pdfBuffer.length),
+        'X-File-Size': String(pdfBuffer.length),
+        'X-Upload-Time': `${uploadDuration}ms`,
+        'X-Conversion-Time': `${conversionDuration}ms`,
+        'X-Generation-Time': `${pdfGenerationDuration}ms`,
       },
     });
   } catch (error: any) {
