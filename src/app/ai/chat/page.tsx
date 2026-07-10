@@ -52,6 +52,8 @@ export default function AIChat() {
       setPdfReady(true);
       setMessages([{ role: 'assistant', content: data.answer }]);
       toast.success('PDF ready! Start asking questions.');
+      // Refresh usage counter immediately after successful AI call
+      toolUsage?.refreshUsage?.();
     } catch (err: any) {
       if (err.response?.status === 403 || err.response?.status === 429) {
         toolUsage?.setShowUpgradeModal(true);
@@ -85,6 +87,8 @@ export default function AIChat() {
         }
       });
       setMessages((prev) => [...prev, { role: 'assistant', content: data.answer }]);
+      // Refresh usage counter immediately after successful AI call
+      toolUsage?.refreshUsage?.();
     } catch (err: any) {
       if (err.response?.status === 403 || err.response?.status === 429) {
         toolUsage?.setShowUpgradeModal(true);

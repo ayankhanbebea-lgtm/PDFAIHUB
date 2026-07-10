@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import mammoth from 'mammoth';
-import { initConversionEngine, getConverterStatus, runPowerShell, recordSuccess, recordError, execWithTimeout } from './converter-init';
+import { initConversionEngine, getConverterStatus, runPowerShell, recordSuccess, recordError, execWithTimeout, executeSofficeHeadless } from './converter-init';
 
 class TaskQueue {
   private queue: Array<{
@@ -144,11 +144,22 @@ export async function convertToPDF(inputPath: string, outDir: string): Promise<s
 
     try {
       if (sofficePath) {
-        const cmd = `"${sofficePath}"`;
         const sharedProfile = path.join(os.tmpdir(), 'libreoffice-shared-profile');
-        const command = `${cmd} -env:UserInstallation="file:///${sharedProfile.replace(/\\/g, '/')}" --headless --invisible --nodefault --nofirststartwizard --nologo --convert-to pdf --outdir "${outDir}" "${inputPath}"`;
-        console.log(`[convertToPDF] Executing LibreOffice with warm profile: ${command}`);
-        await execWithTimeout(command, 60000);
+        const userProfileArg = `-env:UserInstallation=file:///${sharedProfile.replace(/\\/g, '/')}`;
+        const args = [
+          userProfileArg,
+          '--headless',
+          '--invisible',
+          '--nodefault',
+          '--nofirststartwizard',
+          '--nologo',
+          '--convert-to',
+          'pdf',
+          '--outdir',
+          outDir,
+          inputPath
+        ];
+        await executeSofficeHeadless(sofficePath, args, 60000);
       } else {
         console.log(`[convertToPDF] LibreOffice is not installed. Using native conversion fallback...`);
         
@@ -314,11 +325,22 @@ export async function pdfToPDFA(pdfPath: string, outDir: string): Promise<string
       if (!sofficePath) {
         throw new Error('PDF to PDF/A conversion failed: LibreOffice Writer is not installed on this server.');
       }
-      const cmd = `"${sofficePath}"`;
       const sharedProfile = path.join(os.tmpdir(), 'libreoffice-shared-profile');
-      const command = `${cmd} -env:UserInstallation="file:///${sharedProfile.replace(/\\/g, '/')}" --headless --invisible --nodefault --nofirststartwizard --nologo --convert-to pdf:writer_pdf_Export --outdir "${outDir}" "${pdfPath}"`;
-      console.log(`[pdfToPDFA] Executing with warm profile: ${command}`);
-      await execWithTimeout(command, 60000);
+      const userProfileArg = `-env:UserInstallation=file:///${sharedProfile.replace(/\\/g, '/')}`;
+      const args = [
+        userProfileArg,
+        '--headless',
+        '--invisible',
+        '--nodefault',
+        '--nofirststartwizard',
+        '--nologo',
+        '--convert-to',
+        'pdf:writer_pdf_Export',
+        '--outdir',
+        outDir,
+        pdfPath
+      ];
+      await executeSofficeHeadless(sofficePath, args, 60000);
 
       if (!fs.existsSync(expectedPdfPath) || fs.statSync(expectedPdfPath).size === 0) {
         throw new Error('PDF to PDF/A conversion failed. Output PDF/A file not found or size is 0.');

@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { chatWithPDF } from '@/lib/ai';
 import { extractTextFromPDF } from '@/lib/pdf-ai';
 import { checkAiAccess } from '@/lib/ai-access';
-import { incrementUsage, logUsage } from '@/lib/rate-limit';
+import { incrementAiUsage } from '@/lib/ai-usage';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { priorityScheduler } from '@/lib/priority-queue';
 import prisma from '@/lib/prisma';
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   // ── ACCESS GUARD ─────────────────────────────────────────────────────────────
   const access = await checkAiAccess(request);
   if (!access.allowed) return access.response;
-  const { userId, isPro, usage, timezone } = access;
+  const { userId, isPro } = access;
   // ─────────────────────────────────────────────────────────────────────────────
 
   try {
@@ -128,16 +128,15 @@ export async function POST(request: NextRequest) {
       ],
     });
 
-    // ── Consume one AI request (after success) ────────────────────────────────
-    await incrementUsage(userId, 'ai', timezone);
-    await logUsage(userId, 'ai_chat');
+    // ── Count ONE AI request after confirmed success ───────────────────────
+    const { newCount } = await incrementAiUsage(userId, 'chat', '/api/ai/chat');
     // ─────────────────────────────────────────────────────────────────────────
 
     return NextResponse.json({
       success: true,
       sessionId: chatSessionId,
       answer,
-      remaining: usage.remaining - 1,
+      remaining: isPro ? null : Math.max(0, 5 - newCount),
     });
   } catch (error: any) {
     console.error('[chat] FULL ERROR:', error);

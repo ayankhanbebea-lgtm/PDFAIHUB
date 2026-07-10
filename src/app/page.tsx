@@ -59,9 +59,9 @@ export default function HomePage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
-              className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white mb-6 leading-none"
+              className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 dark:text-white mb-6 leading-none"
             >
-              Master Your Studies with <span className="text-white">AI & PDF Tools</span>
+              Master Your Studies with <span className="text-gray-900 dark:text-white">AI & PDF Tools</span>
             </motion.h1>
 
             <motion.p

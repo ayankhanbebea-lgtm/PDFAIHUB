@@ -27,6 +27,7 @@ export interface ToolUsageContextType {
   showUpgradeModal: boolean;
   setShowUpgradeModal: (show: boolean) => void;
   isAI: boolean;
+  refreshUsage: () => void;
 }
 
 export const ToolUsageContext = createContext<ToolUsageContextType | null>(null);
@@ -126,6 +127,7 @@ export function ToolLayout({
         showUpgradeModal,
         setShowUpgradeModal,
         isAI,
+        refreshUsage: fetchUsage,
       }}
     >
       <div className="min-h-screen bg-background text-foreground transition-colors duration-300">

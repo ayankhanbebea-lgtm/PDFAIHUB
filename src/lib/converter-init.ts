@@ -2,7 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { exec, execSync, ChildProcess } from 'child_process';
+import { exec, execSync, ChildProcess, spawn } from 'child_process';
 import { promisify } from 'util';
 
 const execPromise = promisify(exec);
@@ -67,6 +67,67 @@ export function execWithTimeout(command: string, timeoutMs: number = 60000): Pro
     }
   });
 }
+
+/**
+ * Spawns soffice.exe directly to run LibreOffice silently in headless mode
+ * without creating any console / cmd windows on Windows.
+ */
+export function executeSofficeHeadless(sofficePath: string, args: string[], timeoutMs: number = 60000): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    console.log(`[executeSofficeHeadless] Spawning: "${sofficePath}" with args: ${args.join(' ')}`);
+    
+    const child = spawn(sofficePath, args, {
+      windowsHide: true,
+      shell: false
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    if (child.stdout) {
+      child.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+    }
+
+    if (child.stderr) {
+      child.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+    }
+
+    const timer = setTimeout(() => {
+      console.warn(`[executeSofficeHeadless] Process (PID ${child.pid}) timed out after ${timeoutMs}ms. Killing...`);
+      try {
+        if (process.platform === 'win32') {
+          execSync(`taskkill /f /t /pid ${child.pid}`);
+        } else {
+          child.kill('SIGKILL');
+        }
+      } catch (e: any) {
+        console.error(`[executeSofficeHeadless] Error killing process: ${e.message}`);
+      }
+      reject(new Error(`LibreOffice execution timed out after ${timeoutMs / 1000} seconds.`));
+    }, timeoutMs);
+
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      console.log(`[executeSofficeHeadless] Process (PID ${child.pid || 'unknown'}) finished with code ${code}.`);
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(new Error(`LibreOffice exited with code ${code}. Stderr: ${stderr}`));
+      }
+    });
+
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      console.error(`[executeSofficeHeadless] Spawn error:`, err);
+      reject(err);
+    });
+  });
+}
+
 
 /**
  * Dynamically resolves the absolute path of the soffice executable cross-platform.
@@ -154,7 +215,7 @@ export async function initConversionEngine(force = false): Promise<ConverterStat
 
     if (libreOfficePath) {
       try {
-        const { stdout } = await execWithTimeout(`"${libreOfficePath}" --version`, 15000);
+        const { stdout } = await executeSofficeHeadless(libreOfficePath, ['--version'], 15000);
         version = stdout.trim();
         logs.push(`LibreOffice detected: ${version} at ${libreOfficePath}`);
       } catch (err: any) {
@@ -225,8 +286,14 @@ export async function initConversionEngine(force = false): Promise<ConverterStat
       if (libreOfficePath) {
         const csvPath = path.join(testDir, 'test.csv');
         fs.writeFileSync(csvPath, 'Col1,Col2\nVal1,Val2');
-        const cmd = `"${libreOfficePath}"`;
-        await execWithTimeout(`${cmd} --headless --convert-to pdf --outdir "${testDir}" "${csvPath}"`, 20000);
+        await executeSofficeHeadless(libreOfficePath, [
+          '--headless',
+          '--convert-to',
+          'pdf',
+          '--outdir',
+          testDir,
+          csvPath
+        ], 20000);
         const defaultPdf = path.join(testDir, 'test.pdf');
         if (fs.existsSync(defaultPdf)) {
           fs.renameSync(defaultPdf, pdfPath);
@@ -265,8 +332,14 @@ export async function initConversionEngine(force = false): Promise<ConverterStat
       if (libreOfficePath) {
         const txtPath = path.join(testDir, 'test.txt');
         fs.writeFileSync(txtPath, 'PowerPoint self-test data');
-        const cmd = `"${libreOfficePath}"`;
-        await execWithTimeout(`${cmd} --headless --convert-to pdf --outdir "${testDir}" "${txtPath}"`, 20000);
+        await executeSofficeHeadless(libreOfficePath, [
+          '--headless',
+          '--convert-to',
+          'pdf',
+          '--outdir',
+          testDir,
+          txtPath
+        ], 20000);
         const defaultPdf = path.join(testDir, 'test.pdf');
         if (fs.existsSync(defaultPdf)) {
           fs.renameSync(defaultPdf, pdfPath);

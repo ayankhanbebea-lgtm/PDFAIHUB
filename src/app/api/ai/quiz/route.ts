@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { generateQuiz } from '@/lib/ai';
 import { extractTextFromPDF } from '@/lib/pdf-ai';
 import { checkAiAccess } from '@/lib/ai-access';
-import { incrementUsage, logUsage } from '@/lib/rate-limit';
+import { incrementAiUsage } from '@/lib/ai-usage';
 import prisma from '@/lib/prisma';
 
 export const runtime = 'nodejs';
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   // ── ACCESS GUARD ─────────────────────────────────────────────────────────────
   const access = await checkAiAccess(request);
   if (!access.allowed) return access.response;
-  const { userId, usage, timezone } = access;
+  const { userId, isPro } = access;
   // ─────────────────────────────────────────────────────────────────────────────
 
   try {
@@ -48,16 +48,15 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // ── Consume one AI request (after success) ────────────────────────────────
-    await incrementUsage(userId, 'ai', timezone);
-    await logUsage(userId, 'ai_quiz', { questionCount: questions.length });
+    // ── Count ONE AI request after confirmed success ───────────────────────
+    const { newCount } = await incrementAiUsage(userId, 'quiz', '/api/ai/quiz');
     // ─────────────────────────────────────────────────────────────────────────
 
     return NextResponse.json({
       success: true,
       quizId: quiz.id,
       questions,
-      remaining: usage.remaining - 1,
+      remaining: isPro ? null : Math.max(0, 5 - newCount),
     });
   } catch (error: any) {
     console.error('[quiz] FULL ERROR:', error);

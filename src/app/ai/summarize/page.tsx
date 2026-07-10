@@ -93,6 +93,8 @@ export default function SummarizePage() {
       });
       setSummary(data.summary);
       toast.success('Summary generated!');
+      // Refresh usage counter immediately after successful AI call
+      toolUsage?.refreshUsage?.();
     } catch (err: any) {
       if (err.response?.status === 403 || err.response?.status === 429) {
         toolUsage?.setShowUpgradeModal(true);

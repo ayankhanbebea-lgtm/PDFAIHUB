@@ -182,6 +182,8 @@ export default function AIExamModePage() {
               setProgressVal(100);
               setExamPackage(data.examPackage);
               toast.success('AI Exam Package prepared successfully!');
+              // Refresh usage counter immediately after successful AI call
+              toolUsage?.refreshUsage?.();
               fetchHistory();
             } else if (data.type === 'error') {
               throw new Error(data.error);

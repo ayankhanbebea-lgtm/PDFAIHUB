@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateSummary } from '@/lib/ai';
 import { extractTextFromPDF } from '@/lib/pdf-ai';
 import { checkAiAccess } from '@/lib/ai-access';
-import { incrementUsage, logUsage } from '@/lib/rate-limit';
+import { incrementAiUsage } from '@/lib/ai-usage';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { priorityScheduler } from '@/lib/priority-queue';
 import prisma from '@/lib/prisma';
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   // ── ACCESS GUARD ─────────────────────────────────────────────────────────────
   const access = await checkAiAccess(request);
   if (!access.allowed) return access.response;
-  const { userId, isPro, usage, timezone } = access;
+  const { userId, isPro, usage } = access;
   // ─────────────────────────────────────────────────────────────────────────────
 
   try {
@@ -32,7 +32,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'PDF must be under 20MB' }, { status: 400 });
     }
 
-    // Check if same file was already summarized (Token Optimization: Local Cache)
+    // Check if same file was already summarized (cache hit)
+    // NOTE: Cache hits DO count as an AI request — the user requested AI output.
     const existingFile = await prisma.file.findFirst({
       where: {
         userId,
@@ -46,13 +47,17 @@ export async function POST(request: NextRequest) {
     if (existingFile && existingFile.metadata) {
       const meta = existingFile.metadata as any;
       if (meta.summary) {
-        console.log(`[summarize] Cache hit for ${file.name} (${file.size} bytes). Returning cached summary.`);
-        // Cached: don't consume a request
+        console.log(`[summarize] Cache hit for ${file.name} (${file.size} bytes).`);
+
+        // ── Count this as a real AI request even on cache hit ─────────────────
+        const { newCount } = await incrementAiUsage(userId, 'summarize', '/api/ai/summarize');
+        // ─────────────────────────────────────────────────────────────────────
+
         return NextResponse.json({
           success: true,
           summary: meta.summary,
           fileId: existingFile.id,
-          remaining: usage.remaining,
+          remaining: isPro ? null : Math.max(0, 5 - newCount),
         });
       }
     }
@@ -115,16 +120,15 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // ── Consume one AI request (after success) ────────────────────────────────
-    await incrementUsage(userId, 'ai', timezone);
-    await logUsage(userId, 'ai_summary', { fileName: file.name, provider });
+    // ── Count ONE AI request after confirmed success ───────────────────────
+    const { newCount } = await incrementAiUsage(userId, 'summarize', '/api/ai/summarize');
     // ─────────────────────────────────────────────────────────────────────────
 
     return NextResponse.json({
       success: true,
       summary,
       fileId: fileRecord.id,
-      remaining: usage.remaining - 1,
+      remaining: isPro ? null : Math.max(0, 5 - newCount),
     });
   } catch (error: any) {
     console.error('[summarize] ERROR:', error.message);

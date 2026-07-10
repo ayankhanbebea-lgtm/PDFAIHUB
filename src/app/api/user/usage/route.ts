@@ -1,20 +1,29 @@
 // src/app/api/user/usage/route.ts
+// Returns the user's LIVE usage stats directly from the database.
+// All responses include Cache-Control: no-store to prevent any caching.
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { checkUsage } from '@/lib/rate-limit';
+
+const FREE_AI_LIMIT = 5;
+const FREE_PDF_LIMIT = 50;
+
+// Force dynamic — disable ALL Next.js route caching
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, {
+      status: 401,
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+    });
   }
 
-  const timezone = request.headers.get('x-timezone') || 'UTC';
-
   try {
-    // Fetch live user record (plan, daily counters)
+    // Always read fresh from DB — never trust a cached value
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: {
@@ -22,69 +31,82 @@ export async function GET(request: NextRequest) {
         aiUsed: true,
         pdfUsed: true,
         lastReset: true,
+        subscriptions: {
+          where: { status: 'ACTIVE' },
+          orderBy: { currentPeriodEnd: 'desc' },
+          take: 1,
+          select: { currentPeriodEnd: true, status: true, planType: true },
+        },
       },
     });
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    const plan = user.plan;
-    const isPro = plan === 'PRO';
-
-    // Timezone-aware daily reset check
-    const now = new Date();
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone,
-      year: 'numeric', month: '2-digit', day: '2-digit',
-    });
-    const todayStr = formatter.format(now);
-    const lastResetStr = formatter.format(new Date(user.lastReset));
-    const isNewDay = todayStr !== lastResetStr;
-
-    // If day has changed, daily counters are logically 0 (reset not yet triggered in DB)
-    const aiUsedToday = isNewDay ? 0 : user.aiUsed;
-    const pdfUsedToday = isNewDay ? 0 : user.pdfUsed;
-
-    if (isPro) {
-      // Pro users: return real usage for analytics, never show limits
-      const resetInMs = 0; // Pro users don't reset
-      return NextResponse.json({
-        plan,
-        isPro: true,
-        // Daily AI usage (today's actual requests)
-        aiUsed: aiUsedToday,
-        aiLimit: null,         // null = unlimited
-        aiRemaining: null,     // null = unlimited
-        // Daily PDF usage
-        pdfUsed: pdfUsedToday,
-        pdfLimit: null,
-        pdfRemaining: null,
-        resetInMs,
+      return NextResponse.json({ error: 'User not found' }, {
+        status: 404,
+        headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
       });
     }
 
-    // Free user — enforce limits
-    const aiUsage = await checkUsage(session.user.id, 'ai', timezone);
-    const pdfUsage = await checkUsage(session.user.id, 'pdf', timezone);
+    const now = new Date();
+    const activeSub = user.subscriptions[0];
+    const hasActiveSub = activeSub && activeSub.currentPeriodEnd > now;
+    const isPro = user.plan === 'PRO' && !!hasActiveSub;
 
-    const aiRemaining = aiUsage.remaining;
-    const pdfRemaining = pdfUsage.remaining;
+    // UTC-based day check (consistent with incrementAiUsage)
+    const todayUTC = now.toISOString().slice(0, 10);
+    const lastResetUTC = user.lastReset.toISOString().slice(0, 10);
+    const isNewDay = todayUTC !== lastResetUTC;
 
+    // If the day has rolled over, counters are logically 0 until next increment
+    const aiUsedToday = isNewDay ? 0 : user.aiUsed;
+    const pdfUsedToday = isNewDay ? 0 : user.pdfUsed;
+
+    // Time until next midnight UTC
+    const tomorrowMidnight = new Date(todayUTC);
+    tomorrowMidnight.setUTCDate(tomorrowMidnight.getUTCDate() + 1);
+    const resetInMs = isPro ? 0 : Math.max(0, tomorrowMidnight.getTime() - now.getTime());
+
+    console.log(`[usage] User: ${session.user.id} | Plan: ${user.plan} | isPro: ${isPro} | aiUsed (DB): ${user.aiUsed} | isNewDay: ${isNewDay} | aiUsedToday: ${aiUsedToday}`);
+
+    const responseHeaders = {
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    };
+
+    if (isPro) {
+      return NextResponse.json({
+        plan: user.plan,
+        isPro: true,
+        aiUsed: aiUsedToday,
+        aiLimit: null,
+        aiRemaining: null,
+        pdfUsed: pdfUsedToday,
+        pdfLimit: null,
+        pdfRemaining: null,
+        resetInMs: 0,
+      }, { headers: responseHeaders });
+    }
+
+    // Free user
     return NextResponse.json({
-      plan,
+      plan: user.plan,
       isPro: false,
       aiUsed: aiUsedToday,
-      aiLimit: 5,
-      aiRemaining,
-      aiLocked: aiRemaining <= 0,   // UI uses this to render lock wall
+      aiLimit: FREE_AI_LIMIT,
+      aiRemaining: Math.max(0, FREE_AI_LIMIT - aiUsedToday),
+      aiLocked: aiUsedToday >= FREE_AI_LIMIT,
       pdfUsed: pdfUsedToday,
-      pdfLimit: 50,
-      pdfRemaining,
-      resetInMs: Math.max(aiUsage.resetInMs, pdfUsage.resetInMs),
-    });
+      pdfLimit: FREE_PDF_LIMIT,
+      pdfRemaining: Math.max(0, FREE_PDF_LIMIT - pdfUsedToday),
+      resetInMs,
+    }, { headers: responseHeaders });
+
   } catch (error: any) {
     console.error('[usage] Error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to fetch usage' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to fetch usage' }, {
+      status: 500,
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+    });
   }
 }

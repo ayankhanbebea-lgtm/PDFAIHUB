@@ -146,10 +146,13 @@ export async function checkUsage(
 // Increment usage ONLY after successful operations
 // For FREE users: enforces daily limits.
 // For PRO users: still increments for analytics — never blocked.
+// Uses Prisma atomic increment (increment: 1) to prevent race conditions
+// when concurrent AI requests run simultaneously.
 export async function incrementUsage(
   userId: string,
   type: 'ai' | 'pdf',
-  timezone: string = 'UTC'
+  timezone: string = 'UTC',
+  featureName: string = 'unknown'
 ): Promise<UsageStatus> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -172,40 +175,42 @@ export async function incrementUsage(
   const lastResetDateStr = getLocalDateString(new Date(user.lastReset), timezone);
   const isExpired = currentDateStr !== lastResetDateStr;
 
-  let newPdfUsed = user.pdfUsed;
-  let newAiUsed = user.aiUsed;
-  let newLastReset = new Date(user.lastReset);
+  const currentCount = type === 'ai' ? user.aiUsed : user.pdfUsed;
+  console.log(`[incrementUsage] User: ${userId} | Feature: ${featureName} | Type: ${type} | Current AI Count: ${currentCount} | isExpired: ${isExpired} | isPro: ${isPro}`);
+
+  let updatedUser: { aiUsed: number; pdfUsed: number };
 
   if (isExpired) {
-    // Window expired: Reset daily counters and start a new window
-    newPdfUsed = type === 'pdf' ? 1 : 0;
-    newAiUsed = type === 'ai' ? 1 : 0;
-    newLastReset = now;
+    // Window expired: Reset daily counters and set new count to 1
+    updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        pdfUsed: type === 'pdf' ? 1 : 0,
+        aiUsed: type === 'ai' ? 1 : 0,
+        lastReset: now,
+      },
+      select: { aiUsed: true, pdfUsed: true },
+    });
   } else {
-    // Same day: always increment (both Free and Pro)
-    if (type === 'pdf') {
-      newPdfUsed += 1;
-    } else {
-      newAiUsed += 1;
-    }
+    // Same day: use atomic increment to avoid race conditions
+    updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(type === 'pdf' ? { pdfUsed: { increment: 1 } } : { aiUsed: { increment: 1 } }),
+      },
+      select: { aiUsed: true, pdfUsed: true },
+    });
   }
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      pdfUsed: newPdfUsed,
-      aiUsed: newAiUsed,
-      lastReset: newLastReset,
-    },
-  });
+  const newCount = type === 'ai' ? updatedUser.aiUsed : updatedUser.pdfUsed;
+  console.log(`[incrementUsage] User: ${userId} | Feature: ${featureName} | Type: ${type} | Updated AI Count: ${newCount} | Endpoint: /api/ai/${featureName}`);
 
   if (isPro) {
     // Pro users: unlimited, just return status for the response
     return { allowed: true, remaining: Infinity, limit: Infinity, resetInMs: 0 };
   }
 
-  const currentUsed = type === 'ai' ? newAiUsed : newPdfUsed;
-  const remaining = Math.max(0, limit - currentUsed);
+  const remaining = Math.max(0, limit - newCount);
   const resetInMs = getMsUntilNextMidnight(timezone);
 
   return {

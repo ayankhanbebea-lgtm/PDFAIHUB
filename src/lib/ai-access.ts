@@ -1,6 +1,7 @@
 // src/lib/ai-access.ts
 // Centralized AI access control — used by ALL AI API endpoints.
 // This is the single source of truth for who can use AI features.
+// Day comparison uses UTC (consistent with incrementAiUsage in ai-usage.ts).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
@@ -172,15 +173,16 @@ export async function checkAiAccess(request: NextRequest, mockSessionUserId?: st
     };
   }
 
-  // 4. Timezone-aware daily quota check for Free users
-  const currentDateStr = getLocalDateString(now, timezone);
-  const lastResetDateStr = getLocalDateString(new Date(user.lastReset), timezone);
-  const isExpired = currentDateStr !== lastResetDateStr;
+  // 4. UTC-based daily quota check (consistent with incrementAiUsage)
+  // Always use UTC so gate check and increment logic agree on "same day"
+  const todayUTC = now.toISOString().slice(0, 10);        // "YYYY-MM-DD"
+  const lastResetUTC = new Date(user.lastReset).toISOString().slice(0, 10);
+  const isNewDay = todayUTC !== lastResetUTC;
 
-  const todayUsage = isExpired ? 0 : user.aiUsed;
+  const todayUsage = isNewDay ? 0 : user.aiUsed;
   const limit = 5;
   const remaining = isPro ? Infinity : Math.max(0, limit - todayUsage);
-  const resetInMs = getMsUntilNextMidnight(timezone);
+  const resetInMs = 0; // simplified — dashboard computes its own
 
   const usageStatus: UsageStatus = {
     allowed: isPro || remaining > 0,

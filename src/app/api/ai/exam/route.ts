@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { generateExamChunk, mergeChunkResults } from '@/lib/ai';
 import { extractPagesFromPDF, groupPagesIntoChunks, PageChunk } from '@/lib/pdf-ai';
 import { checkAiAccess } from '@/lib/ai-access';
-import { incrementUsage, logUsage } from '@/lib/rate-limit';
+import { incrementAiUsage } from '@/lib/ai-usage';
 import prisma from '@/lib/prisma';
 import fs from 'fs';
 import path from 'path';
@@ -294,16 +294,15 @@ export async function POST(request: NextRequest) {
 
           clearCache(cachePath);
 
-          // ── Consume one AI request (after success) ──────────────────────────
-          await incrementUsage(userId, 'ai', timezone);
-          await logUsage(userId, 'ai_exam_mode', { fileName: file.name, isPro });
-          // ───────────────────────────────────────────────────────────────────
+          // ── Count ONE AI request after confirmed success ─────────────────
+          const { newCount } = await incrementAiUsage(userId, 'exam', '/api/ai/exam');
+          // ──────────────────────────────────────────────────────
 
           send({
             type: 'final_complete',
             packageId,
             examPackage: examData,
-            remaining: usage.remaining - 1,
+            remaining: isPro ? null : Math.max(0, 5 - newCount),
             message: `✔ Complete study package compiled in ${totalDuration}!`
           });
 

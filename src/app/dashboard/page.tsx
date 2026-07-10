@@ -74,22 +74,35 @@ export default function DashboardPage() {
   // Fetch usage stats
   useEffect(() => {
     if (status === 'authenticated') {
+      const fetchAll = () => {
+        axios.get('/api/user/usage', {
+          headers: {
+            'x-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone
+          }
+        })
+          .then(({ data }) => setUsage(data))
+          .catch(console.error);
+      };
+
       axios.get('/api/user/files?limit=8')
         .then(({ data }) => setFiles(data.files || []))
         .catch(() => setFiles([]))
         .finally(() => setFilesLoading(false));
 
-      axios.get('/api/user/usage', {
-        headers: {
-          'x-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone
-        }
-      })
-        .then(({ data }) => setUsage(data))
-        .catch(console.error);
+      fetchAll();
 
       axios.get('/api/user/subscription')
         .then(({ data }) => setSubscription(data.subscription))
         .catch(console.error);
+
+      // Re-fetch usage whenever user returns to this tab from an AI page
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          fetchAll();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }
   }, [status]);
 
