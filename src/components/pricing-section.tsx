@@ -8,6 +8,27 @@ import { Check, Zap, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
+const freeFeatures = [
+  { text: '50 PDF operations daily', included: true },
+  { text: '10 AI Notes Summaries daily', included: true },
+  { text: 'All standard PDF Tools', included: true },
+  { text: 'Flashcard Generator', included: false },
+  { text: 'Interactive Quiz Generator', included: false },
+  { text: 'Priority processing', included: false },
+  { text: 'Full download history', included: false },
+];
+
+const proFeatures = [
+  { text: 'AI Exam Mode 🚀', badge: 'Most Popular', included: true },
+  { text: 'Unlimited PDF operations', included: true },
+  { text: 'All PDF Tools', included: true },
+  { text: 'AI PDF Chat', included: true },
+  { text: 'Flashcard & Quiz Generator', included: true },
+  { text: 'Priority processing', included: true },
+  { text: 'Full download history', included: true },
+  { text: 'No ads, ever', included: true },
+];
+
 export function PricingSection() {
   const { data: session } = useSession();
   const [loadingPlan, setLoadingPlan] = useState<'monthly' | 'yearly' | null>(null);
@@ -64,8 +85,24 @@ export function PricingSection() {
         document.body.appendChild(rzpScript);
 
         rzpScript.onload = () => {
+          const clientKeyId = data.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+          const maskedKeyId = clientKeyId
+            ? `${clientKeyId.slice(0, 8)}...${clientKeyId.slice(-4)}`
+            : 'NONE';
+          const isLive = clientKeyId?.startsWith('rzp_live');
+          const isTest = clientKeyId?.startsWith('rzp_test');
+          const mode = isLive ? 'Live' : isTest ? 'Test' : 'Unknown';
+
+          console.log('[Razorpay Checkout initialized] audit details:', {
+            keyIdMasked: maskedKeyId,
+            orderId: data.orderId,
+            mode,
+            planType,
+            environment: process.env.NODE_ENV
+          });
+
           const options = {
-            key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+            key: clientKeyId,
             amount: data.amount,
             currency: data.currency || 'INR',
             order_id: data.orderId,
@@ -87,8 +124,8 @@ export function PricingSection() {
                 });
 
                 if (verifyRes.data.success) {
-                  toast.success('Payment verified successfully!');
-                  window.location.href = `/payment/success?orderId=${response.razorpay_order_id}`;
+                   toast.success('Payment verified successfully!');
+                   window.location.href = `/payment/success?orderId=${response.razorpay_order_id}`;
                 } else {
                   window.location.href = '/payment/failed';
                 }
@@ -126,27 +163,6 @@ export function PricingSection() {
       setLoadingPlan(null);
     }
   };
-
-  const freeFeatures = [
-    { text: '50 PDF operations daily', included: true },
-    { text: '10 AI Notes Summaries daily', included: true },
-    { text: 'All standard PDF Tools', included: true },
-    { text: 'Flashcard Generator', included: false },
-    { text: 'Interactive Quiz Generator', included: false },
-    { text: 'Priority processing', included: false },
-    { text: 'Full download history', included: false },
-  ];
-
-  const proFeatures = [
-    { text: 'AI Exam Mode 🚀', badge: 'Most Popular', included: true },
-    { text: 'Unlimited PDF operations', included: true },
-    { text: 'All PDF Tools', included: true },
-    { text: 'AI PDF Chat', included: true },
-    { text: 'Flashcard & Quiz Generator', included: true },
-    { text: 'Priority processing', included: true },
-    { text: 'Full download history', included: true },
-    { text: 'No ads, ever', included: true },
-  ];
 
   return (
     <section id="pricing" className="py-20 bg-secondary/30 transition-colors duration-300">

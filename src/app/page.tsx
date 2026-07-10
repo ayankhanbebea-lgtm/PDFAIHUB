@@ -6,8 +6,12 @@ import { useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import { Navbar } from '@/components/layout/navbar';
 import { Footer } from '@/components/layout/footer';
-import { PricingSection } from '@/components/pricing-section';
-import { ArrowRight } from 'lucide-react';const freePdfTools = [
+import dynamic from 'next/dynamic';
+import { ArrowRight } from 'lucide-react';
+
+const PricingSection = dynamic(() => import('@/components/pricing-section').then((mod) => mod.PricingSection), {
+  loading: () => <div className="py-20 text-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" /></div>
+});const freePdfTools = [
   { icon: '🔗', name: 'PDF Merge', desc: 'Combine multiple PDFs into one file', href: '/tools/merge', color: 'from-blue-500 to-indigo-500' },
   { icon: '✂️', name: 'PDF Split', desc: 'Extract specific pages or split by range', href: '/tools/split', color: 'from-purple-500 to-pink-500' },
   { icon: '🗜️', name: 'PDF Compress', desc: 'Reduce file size without quality loss', href: '/tools/compress', color: 'from-green-500 to-emerald-500' },

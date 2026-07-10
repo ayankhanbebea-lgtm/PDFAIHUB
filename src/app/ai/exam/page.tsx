@@ -1,6 +1,6 @@
 'use client';
 // src/app/ai/exam/page.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
@@ -338,7 +338,17 @@ export default function AIExamModePage() {
   };
 
   // Helper lists
-  const uniqueFlashcardChapters = ['All', ...new Set((examPackage?.flashcards || []).map((c: any) => c.chapter).filter(Boolean) as string[])];
+  const uniqueFlashcardChapters = useMemo(() => {
+    return ['All', ...new Set((examPackage?.flashcards || []).map((c: any) => c.chapter).filter(Boolean) as string[])];
+  }, [examPackage?.flashcards]);
+
+  const filteredMcqs = useMemo(() => {
+    return (examPackage?.mcqs || []).filter((m: any) => mcqFilter === 'All' || m.difficulty === mcqFilter);
+  }, [examPackage?.mcqs, mcqFilter]);
+
+  const filteredFlashcards = useMemo(() => {
+    return (examPackage?.flashcards || []).filter((c: any) => flashcardChapterFilter === 'All' || c.chapter === flashcardChapterFilter);
+  }, [examPackage?.flashcards, flashcardChapterFilter]);
 
   return (
     <ToolLayout
@@ -923,7 +933,7 @@ export default function AIExamModePage() {
                   </div>
 
                   <div className="space-y-6">
-                    {examPackage.mcqs?.filter((m: any) => mcqFilter === 'All' || m.difficulty === mcqFilter).map((mcq: any, idx: number) => {
+                    {filteredMcqs.map((mcq: any, idx: number) => {
                       const isBlurred = !isProUser && idx >= 5;
                       return (
                         <div
@@ -1029,7 +1039,7 @@ export default function AIExamModePage() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                    {examPackage.flashcards?.filter((c: any) => flashcardChapterFilter === 'All' || c.chapter === flashcardChapterFilter).map((card: any, idx: number) => {
+                    {filteredFlashcards.map((card: any, idx: number) => {
                       const isBlurred = !isProUser && idx >= 3;
                       const isFlipped = flippedCards[idx] ?? false;
 
