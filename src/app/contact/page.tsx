@@ -64,6 +64,13 @@ export default function ContactPage() {
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     We typically respond to business and technical inquiries within 24 to 48 hours. If you are experiencing tool execution issues, please provide screenshots or file format details.
                   </p>
+                  <p className="text-sm text-muted-foreground/80 leading-relaxed mt-5">
+                    We usually respond within 24–48 hours. If you haven&apos;t received a response within 48 hours, please contact us directly at{' '}
+                    <a href="mailto:pdfaihub@gmail.com" className="text-primary hover:underline font-medium">
+                      pdfaihub@gmail.com
+                    </a>{' '}
+                    and we&apos;ll be happy to assist you.
+                  </p>
                 </div>
               </div>
 

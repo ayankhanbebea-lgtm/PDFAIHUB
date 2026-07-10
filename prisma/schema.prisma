@@ -258,3 +258,13 @@ model ExamPackage {
 
   @@index([userId])
 }
+
+model ContactSubmission {
+  id        String   @id @default(cuid())
+  ip        String
+  email     String
+  createdAt DateTime @default(now())
+
+  @@index([ip, createdAt])
+}
+
