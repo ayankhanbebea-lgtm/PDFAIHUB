@@ -6,6 +6,62 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import prisma from './prisma';
 
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+const isGoogleConfigured = !!(
+  googleClientId &&
+  googleClientSecret &&
+  googleClientId !== 'your-google-client-id.apps.googleusercontent.com' &&
+  googleClientSecret !== 'GOCSPX-your-google-client-secret'
+);
+
+const providers: any[] = [];
+
+if (isGoogleConfigured) {
+  providers.push(
+    GoogleProvider({
+      clientId: googleClientId!,
+      clientSecret: googleClientSecret!,
+      allowDangerousEmailAccountLinking: true,
+    })
+  );
+}
+
+providers.push(
+  CredentialsProvider({
+    name: 'credentials',
+    credentials: {
+      email: { label: 'Email', type: 'email' },
+      password: { label: 'Password', type: 'password' },
+    },
+    async authorize(credentials) {
+      if (!credentials?.email || !credentials?.password) {
+        throw new Error('Email and password required');
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { email: credentials.email.toLowerCase().trim() },
+      });
+
+      if (!user) throw new Error('No account found with this email');
+      if (!user.password) throw new Error('Please sign in with Google');
+      if (user.banned) throw new Error('Account suspended. Contact support.');
+
+      const isValid = await bcrypt.compare(credentials.password, user.password);
+      if (!isValid) throw new Error('Incorrect password');
+
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        image: user.image,
+        role: user.role,
+        plan: user.plan,
+      };
+    },
+  })
+);
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
   session: { strategy: 'jwt', maxAge: 30 * 24 * 60 * 60 },
@@ -13,45 +69,7 @@ export const authOptions: NextAuthOptions = {
     signIn: '/auth/login',
     error: '/auth/login',
   },
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      allowDangerousEmailAccountLinking: true,
-    }),
-    CredentialsProvider({
-      name: 'credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email and password required');
-        }
-
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email.toLowerCase().trim() },
-        });
-
-        if (!user) throw new Error('No account found with this email');
-        if (!user.password) throw new Error('Please sign in with Google');
-        if (user.banned) throw new Error('Account suspended. Contact support.');
-
-        const isValid = await bcrypt.compare(credentials.password, user.password);
-        if (!isValid) throw new Error('Incorrect password');
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-          role: user.role,
-          plan: user.plan,
-        };
-      },
-    }),
-  ],
+  providers,
   events: {
     async signIn(message) {
       console.log('[NextAuth] signIn event:', message.user?.email, 'provider:', message.account?.provider);
@@ -88,8 +106,13 @@ export const authOptions: NextAuthOptions = {
         if (session.name) token.name = session.name;
         if (session.plan) token.plan = session.plan;
       }
-      // Refresh from DB on each request to pick up ban/plan changes
-      if (token.id && !user) {
+      // Refresh from DB to pick up ban/plan changes (throttled to once per 30s to prevent DB pool exhaustion)
+      // Skip if running on Edge runtime to avoid Prisma Edge errors
+      const isEdge = process.env.NEXT_RUNTIME === 'edge';
+      const lastRefreshed = (token.lastRefreshed as number) || 0;
+      const nowMs = Date.now();
+
+      if (token.id && !user && !isEdge && nowMs - lastRefreshed > 30000) {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
@@ -124,6 +147,7 @@ export const authOptions: NextAuthOptions = {
             token.plan = dbUser.plan;
             if (dbUser.name) token.name = dbUser.name;
             if (dbUser.image) token.picture = dbUser.image;
+            token.lastRefreshed = nowMs;
           }
         } catch (err) {
           console.error('[NextAuth] jwt DB refresh ERROR:', err);
