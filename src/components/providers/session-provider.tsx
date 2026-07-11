@@ -3,8 +3,46 @@
 import { SessionProvider as NextAuthProvider } from 'next-auth/react';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from 'react-hot-toast';
+import { useEffect } from 'react';
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    const logError = async (message: string, stack: string | undefined) => {
+      try {
+        await fetch('/api/log-client-error', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: window.location.href,
+            message,
+            stack,
+            userAgent: navigator.userAgent,
+          }),
+        });
+      } catch (e) {}
+    };
+
+    const handleWindowError = (event: ErrorEvent) => {
+      logError(event.message, event.error?.stack);
+    };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      logError(
+        typeof reason === 'string' ? reason : reason?.message || 'Promise Rejection',
+        reason?.stack
+      );
+    };
+
+    window.addEventListener('error', handleWindowError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', handleWindowError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
+
   return (
     <NextAuthProvider>
       <ThemeProvider
