@@ -22,7 +22,6 @@ export async function GET(request: NextRequest) {
 
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
 
   const [
     totalUsers,
