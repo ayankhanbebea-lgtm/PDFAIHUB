@@ -12,7 +12,7 @@ const GROQ_KEY   = process.env.GROQ_API_KEY;
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 
 const groqValid   = !!(GROQ_KEY   && GROQ_KEY   !== 'your-groq-api-key'   && GROQ_KEY.startsWith('gsk_'));
-const geminiValid = !!(GEMINI_KEY && GEMINI_KEY !== 'your-gemini-api-key' && GEMINI_KEY.startsWith('AIza'));
+const geminiValid = !!(GEMINI_KEY && GEMINI_KEY !== 'your-gemini-api-key' && (GEMINI_KEY.startsWith('AIza') || GEMINI_KEY.startsWith('AQ.') || GEMINI_KEY.length > 10));
 
 console.log('[ai.ts] Provider status — Groq:', groqValid, '| Gemini:', geminiValid);
 
