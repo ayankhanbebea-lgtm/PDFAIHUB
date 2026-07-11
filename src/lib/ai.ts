@@ -255,7 +255,8 @@ ${pdfContent.slice(0, 10000)}`;
   let currentProvider = resolvedProvider;
   let currentModel = 'llama-3.3-70b-versatile';
   let attempts = 0;
-  const maxAttempts = 3;
+  const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+  const maxAttempts = isVercel ? 1 : 3;
   let delay = 2000;
 
   while (attempts < maxAttempts) {
@@ -423,7 +424,8 @@ export async function generateWithAIWithBackoff(
   let currentModel = preferredModel;
   let delay = 2000;
   let attempts = 0;
-  const maxAttempts = 5;
+  const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+  const maxAttempts = isVercel ? 1 : 5;
 
   while (attempts < maxAttempts) {
     try {
