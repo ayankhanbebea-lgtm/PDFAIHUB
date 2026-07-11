@@ -289,6 +289,17 @@ ${pdfContent.slice(0, 10000)}`;
       attempts++;
       console.warn(`[chatWithPDF] Attempt ${attempts} failed:`, err.message);
       
+      const status = err.status || err.statusCode;
+      const isFatal = status === 401 || status === 403 || status === 400 || 
+                      err.message?.includes('API key') || 
+                      err.message?.includes('unauthorized') || 
+                      err.message?.includes('forbidden');
+
+      if (isFatal) {
+        console.warn(`[chatWithPDF] Fatal provider error (status ${status || 'unknown'}): ${err.message}. Falling back immediately.`);
+        break;
+      }
+
       if (attempts < maxAttempts) {
         const isRateLimit = err.status === 429 || err.message?.includes('429') || err.message?.includes('rate limit');
         if (isRateLimit && currentModel === 'llama-3.3-70b-versatile') {
@@ -436,6 +447,17 @@ export async function generateWithAIWithBackoff(
     } catch (err: any) {
       attempts++;
       console.warn(`[ai] AI generation attempt ${attempts}/${maxAttempts} failed:`, err.message);
+
+      const status = err.status || err.statusCode;
+      const isFatal = status === 401 || status === 403 || status === 400 || 
+                      err.message?.includes('API key') || 
+                      err.message?.includes('unauthorized') || 
+                      err.message?.includes('forbidden');
+
+      if (isFatal) {
+        console.warn(`[ai] Fatal provider error (status ${status || 'unknown'}): ${err.message}. Falling back immediately.`);
+        break;
+      }
 
       if (attempts >= maxAttempts) {
         break;
