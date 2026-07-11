@@ -8,13 +8,15 @@ import { incrementAiUsage } from '@/lib/ai-usage';
 import prisma from '@/lib/prisma';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120; // 2 minutes execution window
 
 function getCachePath(userId: string, filename: string, size: number) {
   const safeName = filename.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const cacheDir = path.join(process.env.APPDATA || '', 'antigravity', 'exam_cache');
+  const baseDir = process.env.APPDATA || os.tmpdir();
+  const cacheDir = path.join(baseDir, 'antigravity', 'exam_cache');
   if (!fs.existsSync(cacheDir)) {
     fs.mkdirSync(cacheDir, { recursive: true });
   }
