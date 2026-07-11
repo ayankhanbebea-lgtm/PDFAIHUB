@@ -131,9 +131,12 @@ export async function POST(request: NextRequest) {
           
           send({ type: 'timing', stage: 'Chunking', durationMs: chunkingDuration });
 
+          const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+          const chunksToProcess = isVercel ? initialChunks.slice(0, 1) : initialChunks;
+
           send({
             type: 'status',
-            message: `Grouping material into ${initialChunks.length} target sections...`
+            message: `Grouping material into ${chunksToProcess.length} target sections...`
           });
 
           const chunksResults: any[] = (cachedData && cachedData.chunksResults) ? cachedData.chunksResults : [];
@@ -192,8 +195,8 @@ export async function POST(request: NextRequest) {
           const concurrencyLimit = 4;
           const activePromises: Set<Promise<any>> = new Set();
           
-          for (let i = 0; i < initialChunks.length; i++) {
-            const chunk = initialChunks[i];
+          for (let i = 0; i < chunksToProcess.length; i++) {
+            const chunk = chunksToProcess[i];
 
             const taskPromise = (async () => {
               if (chunksResults[i]) {
@@ -203,14 +206,14 @@ export async function POST(request: NextRequest) {
                   message: `✔ Loaded cached section (pages ${chunk.startPage}-${chunk.endPage}): "${cachedRes.chapterTitle}"`,
                   chapterTitle: cachedRes.chapterTitle,
                   chunkIndex: i,
-                  totalChunks: initialChunks.length
+                  totalChunks: chunksToProcess.length
                 });
                 return cachedRes;
               }
 
               send({
                 type: 'status',
-                message: `Analyzing pages ${chunk.startPage}-${chunk.endPage} (Section ${i + 1}/${initialChunks.length})...`
+                message: `Analyzing pages ${chunk.startPage}-${chunk.endPage} (Section ${i + 1}/${chunksToProcess.length})...`
               });
 
               const results = await processChunkWithAdaptiveSize(chunk);
@@ -221,7 +224,7 @@ export async function POST(request: NextRequest) {
                 message: `✔ Generated section (pages ${chunk.startPage}-${chunk.endPage}): "${mergedChunkRes.chapterTitle}"`,
                 chapterTitle: mergedChunkRes.chapterTitle,
                 chunkIndex: i,
-                totalChunks: initialChunks.length
+                totalChunks: chunksToProcess.length
               });
 
               return mergedChunkRes;

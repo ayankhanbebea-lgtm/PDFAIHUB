@@ -22,7 +22,11 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
-    const count = parseInt(formData.get('count') as string || '20');
+    let count = parseInt(formData.get('count') as string || '20');
+    const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+    if (isVercel) {
+      count = Math.min(count, 8);
+    }
     const provider = (formData.get('provider') as 'openai' | 'gemini' | 'groq') || 'groq';
     console.log(`[flashcards] Request — file: ${file?.name}, count: ${count}, provider: ${provider}`);
 
