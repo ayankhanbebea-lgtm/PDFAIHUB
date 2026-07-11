@@ -65,6 +65,7 @@ providers.push(
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
   session: { strategy: 'jwt', maxAge: 30 * 24 * 60 * 60 },
+  useSecureCookies: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
   pages: {
     signIn: '/auth/login',
     error: '/auth/login',
