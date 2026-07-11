@@ -14,8 +14,21 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  console.log('[DEBUG /api/user/usage] GET request received');
+  console.log('[DEBUG /api/user/usage] Env availability - DATABASE_URL:', !!process.env.DATABASE_URL, 'NEXTAUTH_SECRET:', !!process.env.NEXTAUTH_SECRET, 'NEXTAUTH_URL:', !!process.env.NEXTAUTH_URL);
+
+  let session;
+  try {
+    console.log('[DEBUG /api/user/usage] Calling getServerSession...');
+    session = await getServerSession(authOptions);
+    console.log('[DEBUG /api/user/usage] getServerSession completed successfully. Session User ID:', session?.user?.id, 'Role:', session?.user?.role, 'Plan:', session?.user?.plan);
+  } catch (err: any) {
+    console.error('[DEBUG /api/user/usage] getServerSession THREW AN ERROR:', err.message, err.stack);
+    return NextResponse.json({ error: 'Auth session error: ' + err.message }, { status: 500 });
+  }
+
   if (!session?.user?.id) {
+    console.warn('[DEBUG /api/user/usage] Session unauthorized (no user.id)');
     return NextResponse.json({ error: 'Unauthorized' }, {
       status: 401,
       headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
@@ -23,7 +36,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Always read fresh from DB — never trust a cached value
+    console.log('[DEBUG /api/user/usage] Testing database connection...');
+    await prisma.$queryRaw`SELECT 1`;
+    console.log('[DEBUG /api/user/usage] Database connectivity check PASSED');
+  } catch (dbErr: any) {
+    console.error('[DEBUG /api/user/usage] Database connectivity check FAILED:', dbErr.message, dbErr.stack);
+    return NextResponse.json({ error: 'Database connectivity error: ' + dbErr.message }, { status: 500 });
+  }
+
+  try {
+    console.log('[DEBUG /api/user/usage] Querying prisma.user.findUnique for user ID:', session.user.id);
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: {
@@ -39,8 +61,10 @@ export async function GET(request: NextRequest) {
         },
       },
     });
+    console.log('[DEBUG /api/user/usage] prisma query completed successfully. User details fetched:', !!user);
 
     if (!user) {
+      console.warn('[DEBUG /api/user/usage] User not found in DB for ID:', session.user.id);
       return NextResponse.json({ error: 'User not found' }, {
         status: 404,
         headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
@@ -52,16 +76,13 @@ export async function GET(request: NextRequest) {
     const hasActiveSub = activeSub && activeSub.currentPeriodEnd > now;
     const isPro = user.plan === 'PRO' && !!hasActiveSub;
 
-    // UTC-based day check (consistent with incrementAiUsage)
     const todayUTC = now.toISOString().slice(0, 10);
     const lastResetUTC = user.lastReset.toISOString().slice(0, 10);
     const isNewDay = todayUTC !== lastResetUTC;
 
-    // If the day has rolled over, counters are logically 0 until next increment
     const aiUsedToday = isNewDay ? 0 : user.aiUsed;
     const pdfUsedToday = isNewDay ? 0 : user.pdfUsed;
 
-    // Time until next midnight UTC
     const tomorrowMidnight = new Date(todayUTC);
     tomorrowMidnight.setUTCDate(tomorrowMidnight.getUTCDate() + 1);
     const resetInMs = isPro ? 0 : Math.max(0, tomorrowMidnight.getTime() - now.getTime());
@@ -88,7 +109,6 @@ export async function GET(request: NextRequest) {
       }, { headers: responseHeaders });
     }
 
-    // Free user
     return NextResponse.json({
       plan: user.plan,
       isPro: false,
@@ -103,7 +123,7 @@ export async function GET(request: NextRequest) {
     }, { headers: responseHeaders });
 
   } catch (error: any) {
-    console.error('[usage] Error:', error);
+    console.error('[DEBUG /api/user/usage] Query execution FAILED with error:', error.message, error.stack);
     return NextResponse.json({ error: error.message || 'Failed to fetch usage' }, {
       status: 500,
       headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
