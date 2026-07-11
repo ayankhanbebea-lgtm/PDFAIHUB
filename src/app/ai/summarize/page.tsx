@@ -99,8 +99,9 @@ export default function SummarizePage() {
       if (err.response?.status === 403 || err.response?.status === 429) {
         toolUsage?.setShowUpgradeModal(true);
       }
-      const msg = err.response?.data?.message || err.response?.data?.error || 'Failed to generate summary';
-      toast.error(msg);
+      const rawError = err.response?.data?.message || err.response?.data?.error || 'Failed to generate summary';
+      const errMsg = typeof rawError === 'object' ? (rawError.message || JSON.stringify(rawError)) : rawError;
+      toast.error(String(errMsg));
     } finally {
       setLoading(false);
     }

@@ -58,7 +58,9 @@ export default function AIChat() {
       if (err.response?.status === 403 || err.response?.status === 429) {
         toolUsage?.setShowUpgradeModal(true);
       }
-      toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to process PDF');
+      const rawError = err.response?.data?.message || err.response?.data?.error || 'Failed to process PDF';
+      const errMsg = typeof rawError === 'object' ? (rawError.message || JSON.stringify(rawError)) : rawError;
+      toast.error(String(errMsg));
     } finally {
       setUploadingPDF(false);
     }
@@ -93,7 +95,9 @@ export default function AIChat() {
       if (err.response?.status === 403 || err.response?.status === 429) {
         toolUsage?.setShowUpgradeModal(true);
       }
-      toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to get answer');
+      const rawError = err.response?.data?.message || err.response?.data?.error || 'Failed to get answer';
+      const errMsg = typeof rawError === 'object' ? (rawError.message || JSON.stringify(rawError)) : rawError;
+      toast.error(String(errMsg));
       setMessages((prev) => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }]);
     } finally {
       setLoading(false);

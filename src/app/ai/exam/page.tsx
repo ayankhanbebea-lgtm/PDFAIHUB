@@ -88,7 +88,9 @@ export default function AIExamModePage() {
       toast.success('Exam Package loaded successfully!');
       setShowHistory(false);
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to load package');
+      const rawError = err.response?.data?.error || 'Failed to load package';
+      const errMsg = typeof rawError === 'object' ? (rawError.message || JSON.stringify(rawError)) : rawError;
+      toast.error(String(errMsg));
     } finally {
       setLoading(false);
     }

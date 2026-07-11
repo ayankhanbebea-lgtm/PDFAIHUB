@@ -49,7 +49,9 @@ export default function FlashcardsPage() {
       if (err.response?.status === 403 || err.response?.status === 429) {
         toolUsage?.setShowUpgradeModal(true);
       }
-      toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to generate flashcards');
+      const rawError = err.response?.data?.message || err.response?.data?.error || 'Failed to generate flashcards';
+      const errMsg = typeof rawError === 'object' ? (rawError.message || JSON.stringify(rawError)) : rawError;
+      toast.error(String(errMsg));
     } finally {
       setLoading(false);
     }
