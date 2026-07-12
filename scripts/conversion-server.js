@@ -2,14 +2,14 @@
 // ─────────────────────────────────────────────────────────────
 // Dedicated LibreOffice Conversion Microservice for Railway/Render/VPS
 // Handles PowerPoint-to-PDF, Excel-to-PDF, PDF-to-PDF/A, and legacy DOC conversions.
-// Includes in-memory log buffer for remote diagnostics.
+// Optimized for shell safety, zombie prevention, and name escaping.
 // ─────────────────────────────────────────────────────────────
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const crypto = require('crypto');
 
 const PORT = process.env.PORT || 8080;
@@ -24,7 +24,7 @@ function log(msg, type = 'INFO') {
   if (logBuffer.length > 500) logBuffer.shift(); // Keep last 500 lines
 }
 
-log('Starting conversion microservice...');
+log('Starting conversion microservice with safe execFile execution...');
 
 // Resolve soffice executable path
 function getSofficePath() {
@@ -100,11 +100,28 @@ const server = http.createServer((req, res) => {
     const boundary = boundaryMatch[1];
     let body = Buffer.alloc(0);
 
+    // Setup connection termination cleanup
+    let requestFinished = false;
+    const tempDirId = crypto.randomBytes(8).toString('hex');
+    const tempDir = path.join(os.tmpdir(), `soffice-${tempDirId}`);
+
+    const cleanupTempDir = () => {
+      try {
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+          log(`Cleaned up temporary directory: ${tempDir}`);
+        }
+      } catch (cleanupErr) {
+        log(`Cleanup warning: ${cleanupErr.message}`, 'WARN');
+      }
+    };
+
     req.on('data', chunk => {
       body = Buffer.concat([body, chunk]);
     });
 
     req.on('end', () => {
+      if (requestFinished) return;
       try {
         log(`Finished reading body stream. Total size: ${body.length} bytes`);
 
@@ -152,13 +169,15 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        log(`Processing file: ${filename} (${fileData.length} bytes), convertToType: ${convertToType}`);
+        // Rename the uploaded file to a safe, fixed name ("input.[ext]")
+        // This guarantees no spaces, parentheses, or shell metacharacters in paths.
+        const fileExt = path.extname(filename);
+        const safeInputName = `input${fileExt}`;
+        
+        log(`Processing file: ${filename} (safely renamed to ${safeInputName}), size: ${fileData.length} bytes, convertToType: ${convertToType}`);
 
-        // Setup unique temporary directories/files
-        const tempDir = path.join(os.tmpdir(), `soffice-${crypto.randomBytes(8).toString('hex')}`);
         fs.mkdirSync(tempDir, { recursive: true });
-
-        const inputPath = path.join(tempDir, filename);
+        const inputPath = path.join(tempDir, safeInputName);
         fs.writeFileSync(inputPath, fileData);
 
         // Map conversion options
@@ -178,11 +197,23 @@ const server = http.createServer((req, res) => {
           inputPath
         ];
 
-        const cmd = `"${sofficeBin}" ${args.join(' ')}`;
-        log(`Executing LibreOffice command: ${cmd}`);
+        // Execute without a shell to prevent argument injection or syntax issues
+        const isWindows = process.platform === 'win32';
+        const binary = isWindows ? sofficeBin : 'timeout';
+        const cmdArgs = isWindows 
+          ? args 
+          : ['--kill-after=70s', '60s', sofficeBin, ...args];
+
+        log(`Spawning process: ${binary} ${cmdArgs.join(' ')}`);
 
         const startExec = Date.now();
-        exec(cmd, { timeout: 60000 }, (convertErr, stdout, stderr) => {
+        execFile(binary, cmdArgs, { timeout: 80000 }, (convertErr, stdout, stderr) => {
+          if (requestFinished) {
+            cleanupTempDir();
+            return;
+          }
+          requestFinished = true;
+
           try {
             const duration = Date.now() - startExec;
             log(`LibreOffice execution finished in ${duration}ms.`);
@@ -196,8 +227,8 @@ const server = http.createServer((req, res) => {
               return;
             }
 
-            const inputBasename = path.basename(inputPath, path.extname(inputPath));
-            const expectedPdfPath = path.join(tempDir, `${inputBasename}.pdf`);
+            // Since the input file was named "input.[ext]", the output is always "input.pdf"
+            const expectedPdfPath = path.join(tempDir, 'input.pdf');
 
             if (!fs.existsSync(expectedPdfPath) || fs.statSync(expectedPdfPath).size === 0) {
               log(`Conversion output PDF missing or empty at: ${expectedPdfPath}`, 'ERROR');
@@ -214,19 +245,31 @@ const server = http.createServer((req, res) => {
             });
             res.end(outputBuffer);
           } finally {
-            // Cleanup temp dir
-            try {
-              fs.rmSync(tempDir, { recursive: true, force: true });
-              log(`Cleaned up temporary directory: ${tempDir}`);
-            } catch (cleanupErr) {
-              log(`Cleanup warning: ${cleanupErr.message}`, 'WARN');
-            }
+            cleanupTempDir();
           }
         });
       } catch (parseErr) {
         log(`Request parse error: ${parseErr.stack}`, 'ERROR');
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Failed to process request data' }));
+        cleanupTempDir();
+      }
+    });
+
+    // Cleanup if client cancels connection before server finishes
+    req.on('close', () => {
+      if (!requestFinished) {
+        requestFinished = true;
+        log('Client closed request connection prematurely. Terminating conversion.', 'WARN');
+        cleanupTempDir();
+      }
+    });
+
+    req.on('error', (err) => {
+      if (!requestFinished) {
+        requestFinished = true;
+        log(`Request connection error: ${err.message}`, 'ERROR');
+        cleanupTempDir();
       }
     });
     return;
