@@ -163,7 +163,7 @@ export async function convertToPDF(inputPath: string, outDir: string): Promise<s
               'Accept': 'application/octet-stream'
             },
             responseType: 'arraybuffer',
-            timeout: 90000
+            timeout: 115000
           }
         );
         
@@ -186,7 +186,7 @@ export async function convertToPDF(inputPath: string, outDir: string): Promise<s
         const response = await axios.post(`${process.env.CONVERSION_BACKEND_URL}/convert`, form, {
           headers: form.getHeaders(),
           responseType: 'arraybuffer',
-          timeout: 90000
+          timeout: 115000
         });
         
         fs.writeFileSync(expectedPdfPath, Buffer.from(response.data));
@@ -406,7 +406,7 @@ export async function pdfToPDFA(pdfPath: string, outDir: string): Promise<string
               'Accept': 'application/octet-stream'
             },
             responseType: 'arraybuffer',
-            timeout: 90000
+            timeout: 115000
           }
         );
         
@@ -429,7 +429,7 @@ export async function pdfToPDFA(pdfPath: string, outDir: string): Promise<string
         const response = await axios.post(`${process.env.CONVERSION_BACKEND_URL}/convert`, form, {
           headers: form.getHeaders(),
           responseType: 'arraybuffer',
-          timeout: 90000
+          timeout: 115000
         });
         
         fs.writeFileSync(expectedPdfPath, Buffer.from(response.data));
