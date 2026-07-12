@@ -143,6 +143,28 @@ export async function convertToPDF(inputPath: string, outDir: string): Promise<s
     console.log(`[convertToPDF] Converting: ${inputPath}. Ext: ${inputExt}. Soffice: ${sofficePath || 'none'}`);
 
     try {
+      if (process.env.CONVERSION_BACKEND_URL) {
+        console.log(`[convertToPDF] Proxying office conversion to dedicated backend: ${process.env.CONVERSION_BACKEND_URL}`);
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const axios = require('axios');
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const FormData = require('form-data');
+        
+        const form = new FormData();
+        form.append('file', fs.createReadStream(inputPath));
+        form.append('type', 'pdf');
+        
+        const response = await axios.post(`${process.env.CONVERSION_BACKEND_URL}/convert`, form, {
+          headers: form.getHeaders(),
+          responseType: 'arraybuffer',
+          timeout: 90000
+        });
+        
+        fs.writeFileSync(expectedPdfPath, Buffer.from(response.data));
+        recordSuccess();
+        return expectedPdfPath;
+      }
+
       if (sofficePath) {
         const sharedProfile = path.join(os.tmpdir(), 'libreoffice-shared-profile');
         const userProfileArg = `-env:UserInstallation=file:///${sharedProfile.replace(/\\/g, '/')}`;
@@ -336,6 +358,28 @@ export async function pdfToPDFA(pdfPath: string, outDir: string): Promise<string
     const expectedPdfPath = path.join(outDir, `${inputBasename}.pdf`);
 
     try {
+      if (process.env.CONVERSION_BACKEND_URL) {
+        console.log(`[pdfToPDFA] Proxying PDF/A conversion to dedicated backend: ${process.env.CONVERSION_BACKEND_URL}`);
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const axios = require('axios');
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const FormData = require('form-data');
+        
+        const form = new FormData();
+        form.append('file', fs.createReadStream(pdfPath));
+        form.append('type', 'pdfa');
+        
+        const response = await axios.post(`${process.env.CONVERSION_BACKEND_URL}/convert`, form, {
+          headers: form.getHeaders(),
+          responseType: 'arraybuffer',
+          timeout: 90000
+        });
+        
+        fs.writeFileSync(expectedPdfPath, Buffer.from(response.data));
+        recordSuccess();
+        return expectedPdfPath;
+      }
+
       if (!sofficePath) {
         throw new Error('PDF to PDF/A conversion failed: LibreOffice Writer is not installed on this server.');
       }
