@@ -187,21 +187,20 @@ export async function extractTextFromPDF(pdfBuffer: Buffer): Promise<string> {
 
   if (strategy1Text.length > 50) return strategy1Text;
 
-  // ── Strategy 2: pdf-parse fallback (works on some older PDFs) ─────────────
+  // ── Strategy 2: pdf-parse fallback ────────────────────────────────────────
   console.log('[pdf-ai] Strategy 2: trying pdf-parse...');
   try {
-    // Use internal lib to avoid Next.js module-time execution issues
+    // Use internal lib to avoid Next.js module-time execution issues.
+    // Do NOT pass version — use the default (v1.10.100) which is stable on Vercel.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const pdfParseFn = require('pdf-parse/lib/pdf-parse.js');
-    const result = await pdfParseFn(pdfBuffer, {
-      max: 0,
-      version: 'v2.0.550',
-    });
+    const result = await pdfParseFn(pdfBuffer, { max: 0 });
     const text = (result.text || '').trim();
     console.log(`[pdf-ai] Strategy 2 result: ${text.length} chars, ${result.numpages} pages`);
     if (text.length > 50) return text;
   } catch (e: any) {
-    console.warn('[pdf-ai] Strategy 2 (pdf-parse) failed:', e.message?.slice(0, 120));
+    console.error('[pdf-ai] Strategy 2 (pdf-parse) FULL ERROR:', e.message);
+    console.error('[pdf-ai] Strategy 2 stack:', e.stack?.slice(0, 500));
   }
 
   // ── Strategy 3: Tesseract.js OCR for scanned PDFs ─────────────────────────
