@@ -143,6 +143,35 @@ export async function convertToPDF(inputPath: string, outDir: string): Promise<s
     console.log(`[convertToPDF] Converting: ${inputPath}. Ext: ${inputExt}. Soffice: ${sofficePath || 'none'}`);
 
     try {
+      if (process.env.CONVERTAPI_SECRET) {
+        const fromExt = inputExt.replace('.', '');
+        console.log(`[convertToPDF] Converting via ConvertAPI: ${fromExt} -> pdf`);
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const axios = require('axios');
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const FormData = require('form-data');
+        
+        const form = new FormData();
+        form.append('File', fs.createReadStream(inputPath));
+        
+        const response = await axios.post(
+          `https://v2.convertapi.com/convert/${fromExt}/to/pdf?Secret=${process.env.CONVERTAPI_SECRET}`,
+          form,
+          {
+            headers: {
+              ...form.getHeaders(),
+              'Accept': 'application/octet-stream'
+            },
+            responseType: 'arraybuffer',
+            timeout: 90000
+          }
+        );
+        
+        fs.writeFileSync(expectedPdfPath, Buffer.from(response.data));
+        recordSuccess();
+        return expectedPdfPath;
+      }
+
       if (process.env.CONVERSION_BACKEND_URL) {
         console.log(`[convertToPDF] Proxying office conversion to dedicated backend: ${process.env.CONVERSION_BACKEND_URL}`);
         // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -358,6 +387,34 @@ export async function pdfToPDFA(pdfPath: string, outDir: string): Promise<string
     const expectedPdfPath = path.join(outDir, `${inputBasename}.pdf`);
 
     try {
+      if (process.env.CONVERTAPI_SECRET) {
+        console.log(`[pdfToPDFA] Converting via ConvertAPI: pdf -> pdfa`);
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const axios = require('axios');
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const FormData = require('form-data');
+        
+        const form = new FormData();
+        form.append('File', fs.createReadStream(pdfPath));
+        
+        const response = await axios.post(
+          `https://v2.convertapi.com/convert/pdf/to/pdfa?Secret=${process.env.CONVERTAPI_SECRET}`,
+          form,
+          {
+            headers: {
+              ...form.getHeaders(),
+              'Accept': 'application/octet-stream'
+            },
+            responseType: 'arraybuffer',
+            timeout: 90000
+          }
+        );
+        
+        fs.writeFileSync(expectedPdfPath, Buffer.from(response.data));
+        recordSuccess();
+        return expectedPdfPath;
+      }
+
       if (process.env.CONVERSION_BACKEND_URL) {
         console.log(`[pdfToPDFA] Proxying PDF/A conversion to dedicated backend: ${process.env.CONVERSION_BACKEND_URL}`);
         // eslint-disable-next-line @typescript-eslint/no-var-requires
