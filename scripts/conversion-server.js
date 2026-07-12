@@ -2,7 +2,7 @@
 // ─────────────────────────────────────────────────────────────
 // Dedicated LibreOffice Conversion Microservice for Railway/Render/VPS
 // Handles PowerPoint-to-PDF, Excel-to-PDF, PDF-to-PDF/A, and legacy DOC conversions.
-// Optimized for shell safety, zombie prevention, and name escaping.
+// Optimized for shell safety, zombie prevention, and premature abort checking.
 // ─────────────────────────────────────────────────────────────
 
 const http = require('http');
@@ -170,7 +170,6 @@ const server = http.createServer((req, res) => {
         }
 
         // Rename the uploaded file to a safe, fixed name ("input.[ext]")
-        // This guarantees no spaces, parentheses, or shell metacharacters in paths.
         const fileExt = path.extname(filename);
         const safeInputName = `input${fileExt}`;
         
@@ -256,19 +255,19 @@ const server = http.createServer((req, res) => {
       }
     });
 
-    // Cleanup if client cancels connection before server finishes
-    req.on('close', () => {
-      if (!requestFinished) {
+    // Cleanup if client cancels connection before server finishes (using Response object)
+    res.on('close', () => {
+      if (!res.writableFinished && !requestFinished) {
         requestFinished = true;
-        log('Client closed request connection prematurely. Terminating conversion.', 'WARN');
+        log('Client aborted response connection prematurely. Terminating conversion.', 'WARN');
         cleanupTempDir();
       }
     });
 
-    req.on('error', (err) => {
+    res.on('error', (err) => {
       if (!requestFinished) {
         requestFinished = true;
-        log(`Request connection error: ${err.message}`, 'ERROR');
+        log(`Response connection error: ${err.message}`, 'ERROR');
         cleanupTempDir();
       }
     });
