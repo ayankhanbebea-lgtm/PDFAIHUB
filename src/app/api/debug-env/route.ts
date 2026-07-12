@@ -19,6 +19,8 @@ export async function GET(request: NextRequest) {
     'RESEND_API_KEY',
     'RAZORPAY_KEY_ID',
     'RAZORPAY_KEY_SECRET',
+    'CONVERSION_BACKEND_URL',
+    'CONVERTAPI_SECRET',
   ];
 
   const envs: Record<string, { defined: boolean; length: number; prefix?: string }> = {};
