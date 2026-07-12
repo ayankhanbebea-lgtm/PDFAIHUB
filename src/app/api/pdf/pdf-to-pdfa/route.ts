@@ -45,13 +45,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Valid PDF document required' }, { status: 400 });
     }
 
+    const hasExternalEngine = !!(process.env.CONVERTAPI_SECRET || process.env.CONVERSION_BACKEND_URL);
+
     // Ensure conversion engine status is loaded
     let status = getConverterStatus();
     if (!status || status.libreOfficeStatus === 'MISSING') {
       status = await initConversionEngine(true);
     }
 
-    if (status.libreOfficeStatus === 'MISSING') {
+    if (!hasExternalEngine && status.libreOfficeStatus === 'MISSING') {
       return NextResponse.json({
         error: 'PDF/A conversion is temporarily unavailable. Please verify LibreOffice is installed on the server host.',
         logs: status.errorLogs

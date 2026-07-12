@@ -45,13 +45,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Valid Excel spreadsheet (.xls or .xlsx) required' }, { status: 400 });
     }
 
+    const hasExternalEngine = !!(process.env.CONVERTAPI_SECRET || process.env.CONVERSION_BACKEND_URL);
+
     // Ensure conversion engine status is loaded
     let status = getConverterStatus();
     if (!status) {
       status = await initConversionEngine();
     }
 
-    if (status.libreOfficeStatus === 'MISSING' && !status.excelCOMReady) {
+    if (!hasExternalEngine && status.libreOfficeStatus === 'MISSING' && !status.excelCOMReady) {
       return NextResponse.json({
         error: 'Excel conversion engine is not available. Please verify Microsoft Excel or LibreOffice is installed on the server host.',
         logs: status.errorLogs

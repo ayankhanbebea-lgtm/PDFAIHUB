@@ -46,13 +46,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Valid PowerPoint presentation (.ppt or .pptx) required' }, { status: 400 });
     }
 
+    const hasExternalEngine = !!(process.env.CONVERTAPI_SECRET || process.env.CONVERSION_BACKEND_URL);
+
     // Ensure conversion engine status is loaded
     let status = getConverterStatus();
     if (!status || (status.libreOfficeStatus === 'MISSING' && !status.powerpointCOMReady)) {
       status = await initConversionEngine(true);
     }
 
-    if (status.libreOfficeStatus === 'MISSING' && !status.powerpointCOMReady) {
+    if (!hasExternalEngine && status.libreOfficeStatus === 'MISSING' && !status.powerpointCOMReady) {
       return NextResponse.json({
         error: 'PowerPoint conversion engine is not available. Please verify Microsoft PowerPoint or LibreOffice is installed on the server host.',
         logs: status.errorLogs
