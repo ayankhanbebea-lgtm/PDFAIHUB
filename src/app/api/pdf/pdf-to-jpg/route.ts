@@ -75,18 +75,23 @@ export async function POST(request: NextRequest) {
       contentType = 'image/jpeg';
       outputName = `${file.name.replace(/\.pdf$/i, '')}-page1.jpg`;
     } else {
-      // Multiple pages - compress into a zip archive
+      // Multiple pages - compress into a zip archive using pure JS
       const zipPath = path.join(tempDir, 'pages.zip');
-      // Escape paths for powershell
-      const command = `powershell -Command "Compress-Archive -Path '${tempDir}\\*.jpg' -DestinationPath '${zipPath}'"`;
-      console.log(`[pdf-to-jpg] Zipping pages: ${command}`);
-      await execPromise(command);
-
-      if (!fs.existsSync(zipPath)) {
-        throw new Error('Failed to package extracted pages into a zip archive.');
+      
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const JSZip = require('jszip');
+      const zip = new JSZip();
+      
+      for (const jpgPath of jpgPaths) {
+        const name = path.basename(jpgPath);
+        const data = fs.readFileSync(jpgPath);
+        zip.file(name, data);
       }
+      
+      const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+      fs.writeFileSync(zipPath, zipBuffer);
 
-      responseBuffer = fs.readFileSync(zipPath);
+      responseBuffer = zipBuffer;
       contentType = 'application/zip';
       outputName = `${file.name.replace(/\.pdf$/i, '')}-jpg-pages.zip`;
       tempFiles.push(zipPath);

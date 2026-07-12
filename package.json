@@ -29,6 +29,7 @@
     "docx": "^8.5.0",
     "framer-motion": "^11.11.8",
     "groq-sdk": "^1.3.0",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.456.0",
     "mammoth": "^1.12.0",
     "muhammara": "^6.0.5",
@@ -60,6 +61,7 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/jszip": "^3.4.0",
     "@types/node": "^22.8.4",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

@@ -205,54 +205,68 @@ export async function convertToPDF(inputPath: string, outDir: string): Promise<s
 }
 
 /**
- * Converts an HTML file to PDF using mutool.
+ * Converts an HTML file to PDF using pure WASM MuPDF.
  */
 export async function htmlToPDF(htmlPath: string, outPdfPath: string): Promise<void> {
-  const command = `mutool convert -o "${outPdfPath}" "${htmlPath}"`;
-  console.log(`[htmlToPDF] Executing: ${command}`);
-  await execWithTimeout(command, 30000);
-
-  if (!fs.existsSync(outPdfPath)) {
-    throw new Error('HTML to PDF conversion failed. Output PDF file was not generated.');
+  console.log(`[htmlToPDF] Converting via mupdf WASM: ${htmlPath} -> ${outPdfPath}`);
+  
+  // @ts-ignore
+  const mupdf = await import('mupdf');
+  
+  const htmlBuffer = fs.readFileSync(htmlPath);
+  const doc = mupdf.Document.openDocument(htmlBuffer, 'text/html');
+  
+  // Layout as A4 (595x842 points) at font size 12
+  doc.layout(595, 842, 12);
+  const pageCount = doc.countPages();
+  
+  const outBuf = new mupdf.Buffer();
+  const writer = new mupdf.DocumentWriter(outBuf, 'pdf', '');
+  
+  for (let i = 0; i < pageCount; i++) {
+    const page = doc.loadPage(i);
+    const bounds = page.getBounds();
+    const device = writer.beginPage(bounds);
+    page.run(device, mupdf.Matrix.identity);
+    writer.endPage();
   }
+  
+  writer.close();
+  
+  const finalBuf = Buffer.from(outBuf.asUint8Array());
+  fs.writeFileSync(outPdfPath, finalBuf);
 }
 
 /**
- * Renders all pages of a PDF into JPG images.
+ * Renders all pages of a PDF into JPG images using pure WASM MuPDF.
  */
 export async function pdfToImages(pdfPath: string, outDir: string): Promise<string[]> {
-  const outputPattern = path.join(outDir, 'page-%d.png');
-  const command = `mutool convert -o "${outputPattern}" "${pdfPath}"`;
-  console.log(`[pdfToImages] Executing: ${command}`);
-  await execWithTimeout(command, 30000);
-
-  const files = fs.readdirSync(outDir);
-  const pngFiles = files
-    .filter(f => f.startsWith('page-') && f.endsWith('.png'))
-    .sort((a, b) => {
-      const numA = parseInt(a.replace('page-', '').replace('.png', ''));
-      const numB = parseInt(b.replace('page-', '').replace('.png', ''));
-      return numA - numB;
-    });
-
-  const sharp = (await import('sharp')).default;
+  console.log(`[pdfToImages] Rendering via mupdf WASM: ${pdfPath}`);
+  
+  // @ts-ignore
+  const mupdf = await import('mupdf');
+  
+  const pdfBuffer = fs.readFileSync(pdfPath);
+  const doc = mupdf.Document.openDocument(pdfBuffer, 'application/pdf');
+  const pageCount = doc.countPages();
+  
   const jpgPaths: string[] = [];
-
-  for (const pngFile of pngFiles) {
-    const pngPath = path.join(outDir, pngFile);
-    const jpgFile = pngFile.replace('.png', '.jpg');
+  
+  for (let i = 0; i < pageCount; i++) {
+    const page = doc.loadPage(i);
+    // Render the page to a pixmap at high-resolution (scale = 2)
+    const scaleMatrix = mupdf.Matrix.scale(2, 2);
+    const pixmap = page.toPixmap(scaleMatrix, mupdf.ColorSpace.DeviceRGB);
+    
+    // Save directly as JPEG
+    const jpegBytes = pixmap.asJPEG(90);
+    const jpgFile = `page-${i + 1}.jpg`;
     const jpgPath = path.join(outDir, jpgFile);
-
-    // Convert PNG to JPG
-    await sharp(pngPath).jpeg({ quality: 90 }).toFile(jpgPath);
+    
+    fs.writeFileSync(jpgPath, Buffer.from(jpegBytes));
     jpgPaths.push(jpgPath);
-
-    // Clean up temporary PNG file
-    try {
-      fs.unlinkSync(pngPath);
-    } catch {}
   }
-
+  
   return jpgPaths;
 }
 
