@@ -15,13 +15,15 @@ export async function GET(request: NextRequest) {
     status = await initConversionEngine(force);
   }
 
-  const isPowerPointReady = status.libreOfficeStatus === 'FOUND' || status.powerpointCOMReady;
-  const isExcelReady = status.libreOfficeStatus === 'FOUND' || status.excelCOMReady;
+  const hasExternalEngine = !!(process.env.CONVERTAPI_SECRET || process.env.CONVERSION_BACKEND_URL);
+  const isPowerPointReady = status.libreOfficeStatus === 'FOUND' || status.powerpointCOMReady || hasExternalEngine;
+  const isExcelReady = status.libreOfficeStatus === 'FOUND' || status.excelCOMReady || hasExternalEngine;
   const isWordReady = status.libreOfficeStatus === 'FOUND' || status.wordCOMReady || true;
 
   return NextResponse.json({
     status: 'UP',
     libreOfficeInstalled: status.libreOfficeStatus === 'FOUND' ? 'Yes' : 'No',
+    externalEngineConnected: hasExternalEngine ? (process.env.CONVERTAPI_SECRET ? 'ConvertAPI' : 'Render Backend') : 'None',
     version: status.version,
     executablePath: status.libreOfficePath,
     lastSuccessfulConversion: status.lastSuccessfulConversion,

@@ -57,8 +57,10 @@ export async function POST(request: NextRequest) {
     let pdfPath = path.join(tempDir, `${file.name.replace(/\.(doc|docx)$/i, '')}.pdf`);
     
     const sofficePath = getSofficePath();
-    if (sofficePath) {
-      // Convert Word doc to PDF using LibreOffice
+    const hasExternalEngine = !!(process.env.CONVERTAPI_SECRET || process.env.CONVERSION_BACKEND_URL);
+
+    if (sofficePath || hasExternalEngine) {
+      // Convert Word doc to PDF using LibreOffice or External Engine
       pdfPath = await convertToPDF(inputPath, tempDir);
     } else {
       // Use Mammoth pure-JS fallback for DOCX
