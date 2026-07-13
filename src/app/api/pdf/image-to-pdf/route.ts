@@ -113,8 +113,11 @@ export async function POST(request: NextRequest) {
         'X-File-Size': String(pdfBuffer.length),
       },
     });
-  } catch (error) {
-    console.error('Image to PDF error:', error);
-    return NextResponse.json({ error: 'Failed to convert images to PDF' }, { status: 500 });
+  } catch (error: any) {
+    console.error('Image to PDF error:', error?.message || error);
+    console.error('Image to PDF stack:', error?.stack);
+    return NextResponse.json({
+      error: error?.message || 'Failed to convert images to PDF',
+    }, { status: 500 });
   }
 }
