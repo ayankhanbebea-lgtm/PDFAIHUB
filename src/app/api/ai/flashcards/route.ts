@@ -23,10 +23,6 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     let count = parseInt(formData.get('count') as string || '20');
-    const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
-    if (isVercel) {
-      count = Math.min(count, 8);
-    }
     const provider = (formData.get('provider') as 'openai' | 'gemini' | 'groq') || 'groq';
     console.log(`[flashcards] Request — file: ${file?.name}, count: ${count}, provider: ${provider}`);
 
@@ -42,7 +38,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Could not extract text from PDF' }, { status: 400 });
     }
 
-    const cards = await generateFlashcards(text, Math.min(count, 50), provider);
+    const cards = await generateFlashcards(text, count, provider);
 
     const flashcardSet = await prisma.flashcard.create({
       data: {

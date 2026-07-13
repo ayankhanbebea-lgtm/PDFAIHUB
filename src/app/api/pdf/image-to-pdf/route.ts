@@ -3,7 +3,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { imagesToPDF } from '@/lib/pdf';
 import { checkUsage, incrementUsage, logUsage } from '@/lib/rate-limit';
 import { getGuestIdentifier, checkGuestLimit, incrementGuestUsage } from '@/lib/guest-limit';
 
@@ -49,24 +48,53 @@ export async function POST(request: NextRequest) {
     let sharp: any;
     try { sharp = (await import('sharp')).default; } catch {}
 
-    const imageBuffers: Array<{ buffer: Buffer; mimeType: string }> = [];
-    const batchSize = 8;
-    for (let i = 0; i < orderedFiles.length; i += batchSize) {
-      const batch = orderedFiles.slice(i, i + batchSize);
-      const batchResults = await Promise.all(
-        batch.map(async (file) => {
-          let buffer = Buffer.from(await file.arrayBuffer());
-          if (file.type === 'image/webp' && sharp) {
-            buffer = await sharp(buffer).jpeg({ quality: 90 }).toBuffer();
-            return { buffer, mimeType: 'image/jpeg' };
+    // Import pdf-lib once
+    const { PDFDocument } = await import('pdf-lib');
+    const doc = await PDFDocument.create();
+
+    // Process images sequentially to avoid loading all into memory at once.
+    // Each buffer is released (GC-eligible) after it is embedded into the document.
+    for (const file of orderedFiles) {
+      try {
+        let buffer = Buffer.from(await file.arrayBuffer());
+        let mimeType = file.type;
+
+        // Convert WebP to JPEG because pdf-lib does not support WebP natively
+        if (mimeType === 'image/webp' && sharp) {
+          buffer = await sharp(buffer).jpeg({ quality: 85 }).toBuffer();
+          mimeType = 'image/jpeg';
+        }
+
+        // For very large images, down-scale to at most 4000px on the longest side
+        // to prevent OOM. This only applies when sharp is available.
+        if (sharp && (mimeType === 'image/jpeg' || mimeType === 'image/jpg' || mimeType === 'image/png')) {
+          const meta = await sharp(buffer).metadata();
+          const longest = Math.max(meta.width ?? 0, meta.height ?? 0);
+          if (longest > 4000) {
+            buffer = await sharp(buffer)
+              .resize({ width: 4000, height: 4000, fit: 'inside', withoutEnlargement: true })
+              .toBuffer();
           }
-          return { buffer, mimeType: file.type };
-        })
-      );
-      imageBuffers.push(...batchResults);
+        }
+
+        let image;
+        if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
+          image = await doc.embedJpg(buffer);
+        } else if (mimeType === 'image/png') {
+          image = await doc.embedPng(buffer);
+        } else {
+          continue; // Skip unsupported types
+        }
+
+        const page = doc.addPage([image.width, image.height]);
+        page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+      } catch (e) {
+        console.error(`Image to PDF — error embedding ${file.name}:`, e);
+        // Continue with remaining images instead of failing the whole batch
+      }
     }
 
-    const pdfBuffer = await imagesToPDF(imageBuffers);
+    const pdfBuffer = Buffer.from(await doc.save());
 
     if (session?.user?.id) {
       await incrementUsage(session.user.id, 'pdf');
