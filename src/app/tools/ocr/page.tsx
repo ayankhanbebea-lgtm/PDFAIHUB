@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
-import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { ToolLayout } from '@/components/tools/tool-layout';
 import { FileDropzone } from '@/components/tools/file-dropzone';
 import { UploadProgress } from '@/components/tools/upload-progress';
@@ -79,6 +78,7 @@ export default function OCRPage() {
   const handleDownloadDocx = async () => {
     if (!extractedText) return;
     try {
+      const { Document, Packer, Paragraph, TextRun } = await import('docx');
       const doc = new Document({
         sections: [
           {
