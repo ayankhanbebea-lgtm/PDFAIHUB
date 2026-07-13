@@ -9,7 +9,18 @@ import { getGuestIdentifier, checkGuestLimit, incrementGuestUsage } from '@/lib/
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+function getMemInfo() {
+  const mem = process.memoryUsage();
+  return {
+    rss: `${(mem.rss / 1024 / 1024).toFixed(2)} MB`,
+    heapTotal: `${(mem.heapTotal / 1024 / 1024).toFixed(2)} MB`,
+    heapUsed: `${(mem.heapUsed / 1024 / 1024).toFixed(2)} MB`,
+    external: `${(mem.external / 1024 / 1024).toFixed(2)} MB`,
+  };
+}
+
 export async function POST(request: NextRequest) {
+  console.log('[DEBUG-IMAGE-TO-PDF] Start processing POST request');
   const session = await getServerSession(authOptions);
 
   if (session?.user?.id) {
@@ -29,14 +40,38 @@ export async function POST(request: NextRequest) {
     incrementGuestUsage(id);
   }
 
+  const memoryBefore = getMemInfo();
+  let formData;
   try {
-    const formData = await request.formData();
-    const files = formData.getAll('files') as File[];
-    const orderJson = formData.get('order') as string;
-    const order: number[] = orderJson ? JSON.parse(orderJson) : files.map((_, i) => i);
+    formData = await request.formData();
+  } catch (e: any) {
+    console.error('[DEBUG-IMAGE-TO-PDF] Request parsing failed:', e.message);
+    return NextResponse.json({
+      error: `Failed to parse upload body: ${e.message}`,
+      stack: e.stack,
+      phase: 'parsing_request_body',
+      memory: getMemInfo()
+    }, { status: 400 });
+  }
 
-    if (!files?.length) return NextResponse.json({ error: 'At least one image required' }, { status: 400 });
+  const files = formData.getAll('files') as File[];
+  const orderJson = formData.get('order') as string;
+  const order: number[] = orderJson ? JSON.parse(orderJson) : files.map((_, i) => i);
 
+  if (!files?.length) {
+    return NextResponse.json({ error: 'At least one image required' }, { status: 400 });
+  }
+
+  const totalBytes = files.reduce((acc, f) => acc + f.size, 0);
+  const totalMB = (totalBytes / 1024 / 1024).toFixed(2);
+  const individualSizes = files.map(f => `${f.name}: ${(f.size / 1024 / 1024).toFixed(2)} MB`);
+
+  console.log('[DEBUG-IMAGE-TO-PDF] Number of uploaded images:', files.length);
+  console.log('[DEBUG-IMAGE-TO-PDF] Total upload size (MB):', totalMB);
+  console.log('[DEBUG-IMAGE-TO-PDF] Individual image sizes:', individualSizes);
+  console.log('[DEBUG-IMAGE-TO-PDF] Memory usage before processing:', memoryBefore);
+
+  try {
     const ACCEPTED = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     for (const file of files) {
       if (!ACCEPTED.includes(file.type)) {
@@ -48,31 +83,33 @@ export async function POST(request: NextRequest) {
     let sharp: any;
     try { sharp = (await import('sharp')).default; } catch {}
 
-    // Import pdf-lib once
     const { PDFDocument } = await import('pdf-lib');
     const doc = await PDFDocument.create();
 
-    // Process images sequentially to avoid loading all into memory at once.
-    // Each buffer is released (GC-eligible) after it is embedded into the document.
-    for (const file of orderedFiles) {
+    const memoryDuring: any[] = [];
+
+    // Process images sequentially
+    for (let idx = 0; idx < orderedFiles.length; idx++) {
+      const file = orderedFiles[idx];
+      const memBeforeImg = getMemInfo();
+
       try {
         let buffer = Buffer.from(await file.arrayBuffer());
         let mimeType = file.type;
 
-        // Convert WebP to JPEG because pdf-lib does not support WebP natively
+        // Convert WebP to JPEG
         if (mimeType === 'image/webp' && sharp) {
           buffer = await sharp(buffer).jpeg({ quality: 85 }).toBuffer();
           mimeType = 'image/jpeg';
         }
 
-        // For very large images, down-scale to at most 4000px on the longest side
-        // to prevent OOM. This only applies when sharp is available.
+        // Limit size on the backend too
         if (sharp && (mimeType === 'image/jpeg' || mimeType === 'image/jpg' || mimeType === 'image/png')) {
           const meta = await sharp(buffer).metadata();
           const longest = Math.max(meta.width ?? 0, meta.height ?? 0);
-          if (longest > 4000) {
+          if (longest > 3000) {
             buffer = await sharp(buffer)
-              .resize({ width: 4000, height: 4000, fit: 'inside', withoutEnlargement: true })
+              .resize({ width: 3000, height: 3000, fit: 'inside', withoutEnlargement: true })
               .toBuffer();
           }
         }
@@ -83,18 +120,32 @@ export async function POST(request: NextRequest) {
         } else if (mimeType === 'image/png') {
           image = await doc.embedPng(buffer);
         } else {
-          continue; // Skip unsupported types
+          continue; // Skip unsupported
         }
 
         const page = doc.addPage([image.width, image.height]);
         page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
-      } catch (e) {
-        console.error(`Image to PDF — error embedding ${file.name}:`, e);
-        // Continue with remaining images instead of failing the whole batch
+      } catch (e: any) {
+        console.error(`[DEBUG-IMAGE-TO-PDF] Error processing ${file.name} at index ${idx}:`, e.message);
+        throw new Error(`Failed to embed image "${file.name}" at index ${idx}: ${e.message}\nStack: ${e.stack}`);
       }
+
+      const memAfterImg = getMemInfo();
+      memoryDuring.push({
+        index: idx,
+        name: file.name,
+        size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        memBefore: memBeforeImg,
+        memAfter: memAfterImg
+      });
     }
 
+    console.log('[DEBUG-IMAGE-TO-PDF] Saving PDF document...');
     const pdfBuffer = Buffer.from(await doc.save());
+    const memoryAfter = getMemInfo();
+
+    console.log('[DEBUG-IMAGE-TO-PDF] PDF generated. Size:', (pdfBuffer.length / 1024 / 1024).toFixed(2), 'MB');
+    console.log('[DEBUG-IMAGE-TO-PDF] Memory usage after processing:', memoryAfter);
 
     if (session?.user?.id) {
       await incrementUsage(session.user.id, 'pdf');
@@ -103,7 +154,6 @@ export async function POST(request: NextRequest) {
 
     const outputName = `images-${Date.now()}.pdf`;
 
-    // Return the PDF as a direct binary download
     return new Response(new Uint8Array(pdfBuffer), {
       status: 200,
       headers: {
@@ -114,10 +164,18 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('Image to PDF error:', error?.message || error);
-    console.error('Image to PDF stack:', error?.stack);
+    const errorMem = getMemInfo();
+    console.error('[DEBUG-IMAGE-TO-PDF] Exception occurred:', error.message);
+    console.error(error.stack);
     return NextResponse.json({
-      error: error?.message || 'Failed to convert images to PDF',
+      error: error.message || 'Failed to convert images to PDF',
+      stack: error.stack,
+      numImages: files.length,
+      totalMB,
+      individualSizes,
+      memoryBefore,
+      memoryAfter: errorMem
     }, { status: 500 });
   }
 }
+

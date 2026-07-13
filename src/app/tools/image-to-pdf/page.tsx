@@ -206,8 +206,21 @@ export default function ImageToPDFPage() {
       const response = await fetch('/api/pdf/image-to-pdf', { method: 'POST', body: formData });
 
       if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: 'Conversion failed' }));
-        throw new Error(err.error || 'Conversion failed');
+        let errMsg = 'Conversion failed';
+        try {
+          const err = await response.json();
+          errMsg = err.error || err.message || (err.stack ? `${err.error}\n${err.stack}` : JSON.stringify(err));
+        } catch {
+          try {
+            const txt = await response.text();
+            const match = txt.match(/<title>([\s\S]*?)<\/title>/i);
+            const title = match ? match[1].trim() : '';
+            errMsg = `Server error (${response.status} ${response.statusText}): ${title || txt.substring(0, 150)}`;
+          } catch {
+            errMsg = `Server error (${response.status} ${response.statusText})`;
+          }
+        }
+        throw new Error(errMsg);
       }
 
       const blob = await response.blob();
