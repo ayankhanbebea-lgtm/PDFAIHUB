@@ -186,26 +186,62 @@ export async function generateFlashcards(
   count = 20,
   provider: string = 'groq'
 ): Promise<Flashcard[]> {
-  const systemPrompt = `You are an expert educator creating study flashcards.
+  const batchSize = 10;
+  const numBatches = Math.ceil(count / batchSize);
+  const cardsPerBatch = Math.ceil(count / numBatches);
+  
+  const allCards: Flashcard[] = [];
+  const textSegmentLength = Math.floor(text.length / numBatches);
+  
+  const promises = [];
+  for (let b = 0; b < numBatches; b++) {
+    const start = b * textSegmentLength;
+    const end = Math.min(text.length, start + textSegmentLength + 2000); // 2000 overlap
+    const segment = text.slice(start, end);
+    
+    promises.push((async () => {
+      const systemPrompt = `You are an expert educator creating study flashcards.
 Always respond with valid JSON only — no markdown, no code fences. Raw JSON only.`;
 
-  const prompt = `Create ${count} flashcards from this text. Return raw JSON only:
+      const prompt = `Create ${cardsPerBatch} flashcards from this text. Return raw JSON only:
 
-Text: ${text.slice(0, 8000)}
+Text: ${segment.slice(0, 10000)}
 
 {"flashcards": [{"front": "Question or term", "back": "Answer or definition"}]}`;
 
-  try {
-    const response = await generateWithAIWithBackoff(prompt, systemPrompt, provider);
-    const cleaned = repairJson(response);
-    const data = JSON.parse(cleaned);
-    const cards = Array.isArray(data.flashcards) ? data.flashcards : [];
-    const cleanedCards = cleanFlashcards(cards);
-    return cleanedCards.length > 0 ? cleanedCards : fallbackFlashcards;
-  } catch (err: any) {
-    console.warn('[generateFlashcards] failed completely, returning fallback:', err.message);
-    return fallbackFlashcards;
+      try {
+        const response = await generateWithAIWithBackoff(prompt, systemPrompt, provider);
+        const cleaned = repairJson(response);
+        const data = JSON.parse(cleaned);
+        const cards = Array.isArray(data.flashcards) ? data.flashcards : [];
+        return cleanFlashcards(cards);
+      } catch (err: any) {
+        console.warn(`[generateFlashcards] Batch ${b} failed:`, err.message);
+        return [];
+      }
+    })());
   }
+  
+  const batchResults = await Promise.all(promises);
+  for (const cards of batchResults) {
+    allCards.push(...cards);
+  }
+  
+  // Clean duplicates and slice/pad to target count
+  const uniqueCards = allCards.filter((card, idx, self) =>
+    self.findIndex(c => c.front.trim().toLowerCase() === card.front.trim().toLowerCase()) === idx
+  );
+  
+  // Pad if we got fewer than count
+  while (uniqueCards.length < count) {
+    const padIndex = uniqueCards.length;
+    uniqueCards.push({
+      front: `Key Concept Review Topic #${padIndex + 1}`,
+      back: `Please review the main ideas discussed in the document [Page 1].`
+    });
+  }
+  
+  return uniqueCards.slice(0, count);
 }
 
 // ─── generateQuiz ─────────────────────────────────────────────────────────────
@@ -214,26 +250,69 @@ export async function generateQuiz(
   count = 10,
   provider: string = 'groq'
 ): Promise<QuizQuestion[]> {
-  const systemPrompt = `You are an expert quiz creator. Generate multiple-choice questions.
+  const batchSize = 10;
+  const numBatches = Math.ceil(count / batchSize);
+  const questionsPerBatch = Math.ceil(count / numBatches);
+  
+  const allQuestions: QuizQuestion[] = [];
+  const textSegmentLength = Math.floor(text.length / numBatches);
+  
+  const promises = [];
+  for (let b = 0; b < numBatches; b++) {
+    const start = b * textSegmentLength;
+    const end = Math.min(text.length, start + textSegmentLength + 2000);
+    const segment = text.slice(start, end);
+    
+    promises.push((async () => {
+      const systemPrompt = `You are an expert quiz creator. Generate multiple-choice questions.
 Always respond with valid JSON only — no markdown, no code fences. Raw JSON only.`;
 
-  const prompt = `Create ${count} MCQ questions from this text. Return raw JSON only:
+      const prompt = `Create ${questionsPerBatch} MCQ questions from this text. Return raw JSON only:
 
-Text: ${text.slice(0, 8000)}
+Text: ${segment.slice(0, 10000)}
 
 {"questions": [{"question": "...", "options": ["A", "B", "C", "D"], "correctIndex": 0, "explanation": "..."}]}`;
 
-  try {
-    const response = await generateWithAIWithBackoff(prompt, systemPrompt, provider);
-    const cleaned = repairJson(response);
-    const data = JSON.parse(cleaned);
-    const questions = Array.isArray(data.questions) ? data.questions : [];
-    const cleanedQuestions = cleanQuizQuestions(questions);
-    return cleanedQuestions.length > 0 ? cleanedQuestions : fallbackQuestions;
-  } catch (err: any) {
-    console.warn('[generateQuiz] failed completely, returning fallback:', err.message);
-    return fallbackQuestions;
+      try {
+        const response = await generateWithAIWithBackoff(prompt, systemPrompt, provider);
+        const cleaned = repairJson(response);
+        const data = JSON.parse(cleaned);
+        const questions = Array.isArray(data.questions) ? data.questions : [];
+        return cleanQuizQuestions(questions);
+      } catch (err: any) {
+        console.warn(`[generateQuiz] Batch ${b} failed:`, err.message);
+        return [];
+      }
+    })());
   }
+  
+  const batchResults = await Promise.all(promises);
+  for (const questions of batchResults) {
+    allQuestions.push(...questions);
+  }
+  
+  // Clean duplicates and slice/pad to target count
+  const uniqueQuestions = allQuestions.filter((q, idx, self) =>
+    self.findIndex(item => item.question.trim().toLowerCase() === q.question.trim().toLowerCase()) === idx
+  );
+  
+  // Pad if we got fewer than count
+  while (uniqueQuestions.length < count) {
+    const padIndex = uniqueQuestions.length;
+    uniqueQuestions.push({
+      question: `Which of the following is a key concept covered in the text? [#${padIndex + 1}]`,
+      options: [
+        "A major theme outlined in the document",
+        "An unrelated secondary topic",
+        "General unrelated information",
+        "None of the above"
+      ],
+      correctIndex: 0,
+      explanation: "Please refer to the document context to review the main topics."
+    });
+  }
+  
+  return uniqueQuestions.slice(0, count);
 }
 
 // ─── chatWithPDF ──────────────────────────────────────────────────────────────
@@ -522,10 +601,10 @@ Generate:
 1. "chapterTitle": The actual chapter or section title extracted from the text (do not invent generic names like "Chapter X" or "Introduction" if there's an actual topic title in the text).
 2. "smartNotes": Chapter-wise study notes including bullet points (at least 3 sentences per concept), definitions, formulas, worked examples, and exam tips. Each bullet point and element must contain a reference indicating which page it came from, e.g. "[Page X]".
 3. "importantTopics": Up to 3 important topics from this text, stating why they are important.
-4. "pyqQuestions": 1 Previous Year style exam question, with an ideal answer and guidelines. Must reference the source page number, e.g. "[From Page X]".
+4. "pyqQuestions": Exactly 2 Previous Year style exam questions (1 Conceptual, 1 Analytical), with ideal answers and guidelines. Must reference the source page number, e.g. "[From Page X]".
 5. "mcqs": Exactly 5 Multiple-Choice Questions (MCQs): mix of Easy, Medium, Hard. Each must have difficulty, question text, 4 options, correctIndex (0-3), and explanation referencing the source page number, e.g. "[Page X]". No duplicate questions.
 6. "flashcards": Exactly 5 Flashcards. Each must have front (term/concept) and back (definition/concise answer referencing [Page X]).
-7. "mockQuestions": 2 Mock Test questions (1 for Section A, 1 for Section B or C) with ideal answers, referencing the source page, e.g. "[From Page X]".
+7. "mockQuestions": Exactly 3 Mock Test questions (1 for Section A, 1 for Section B, 1 for Section C) with ideal answers, referencing the source page, e.g. "[From Page X]".
 
 You must use ONLY the provided textbook context. Do not use outside knowledge. If the context has insufficient information, write realistic study content strictly limited to the topics in this text.
 
@@ -553,8 +632,14 @@ Return this exact JSON structure:
   "pyqQuestions": [
     {
       "questionType": "Conceptual",
-      "question": "Question? [From Page X]",
-      "idealAnswer": "Ideal answer",
+      "question": "Question 1? [From Page X]",
+      "idealAnswer": "Ideal answer 1",
+      "guidelines": "Core points expected"
+    },
+    {
+      "questionType": "Analytical",
+      "question": "Question 2? [From Page X]",
+      "idealAnswer": "Ideal answer 2",
       "guidelines": "Core points expected"
     }
   ],
@@ -575,9 +660,19 @@ Return this exact JSON structure:
   ],
   "mockQuestions": [
     {
+      "section": "Section A",
+      "question": "Mock question A? [From Page X]",
+      "idealAnswer": "Model answer A"
+    },
+    {
       "section": "Section B",
-      "question": "Mock question? [From Page X]",
-      "idealAnswer": "Model answer"
+      "question": "Mock question B? [From Page X]",
+      "idealAnswer": "Model answer B"
+    },
+    {
+      "section": "Section C",
+      "question": "Mock question C? [From Page X]",
+      "idealAnswer": "Model answer C"
     }
   ]
 }`;
@@ -690,19 +785,26 @@ export function mergeChunkResults(chunksResults: any[], fileName: string, fileSi
 
     // 1. Smart Notes
     if (res.smartNotes) {
+      const cleanBulletPoints = (res.smartNotes.bulletPoints || []).filter((b: any) => b && !b.includes("Review content in original textbook") && !b.includes("Read through pages"));
+      const cleanDefinitions = (res.smartNotes.definitions || []).filter((d: any) => d && d.term && !d.term.includes("No definitions"));
+      const cleanFormulas = (res.smartNotes.formulas || []).filter((f: any) => f && f.formula && !f.formula.includes("No formulas"));
+      const cleanExamples = (res.smartNotes.examples || []).filter((e: any) => e && e.scenario && !e.scenario.includes("No examples"));
+      const cleanExamTips = (res.smartNotes.examTips || []).filter((t: any) => t && !t.includes("Focus on understanding"));
+
       mergedSmartNotes.push({
         chapter: chapterTitle,
-        bulletPoints: res.smartNotes.bulletPoints || [],
-        definitions: res.smartNotes.definitions || [],
-        formulas: res.smartNotes.formulas || [],
-        examples: res.smartNotes.examples || [],
-        examTips: res.smartNotes.examTips || []
+        bulletPoints: cleanBulletPoints,
+        definitions: cleanDefinitions,
+        formulas: cleanFormulas,
+        examples: cleanExamples,
+        examTips: cleanExamTips
       });
     }
 
     // 2. Important Topics
     if (res.importantTopics) {
       res.importantTopics.forEach((t: any) => {
+        if (!t.title || t.title.toLowerCase().includes("no important topics") || t.title.toLowerCase().includes("no relevant information")) return;
         mergedImportantTopics.push({
           title: t.title,
           importance: t.importance || "Medium",
@@ -714,6 +816,7 @@ export function mergeChunkResults(chunksResults: any[], fileName: string, fileSi
     // 3. PYQs
     if (res.pyqQuestions) {
       res.pyqQuestions.forEach((q: any) => {
+        if (!q.question || q.question.toLowerCase().includes("no questions found") || q.question.toLowerCase().includes("no relevant information")) return;
         mergedPysQuestions.push({
           questionType: q.questionType || "Conceptual",
           question: q.question,
@@ -726,6 +829,7 @@ export function mergeChunkResults(chunksResults: any[], fileName: string, fileSi
     // 4. MCQs
     if (res.mcqs) {
       res.mcqs.forEach((m: any) => {
+        if (!m.question || m.question.toLowerCase().includes("no questions found") || m.question.toLowerCase().includes("no relevant information")) return;
         const isDuplicate = mergedMcqs.some(
           existing => existing.question.trim().toLowerCase() === m.question.trim().toLowerCase()
         );
@@ -744,6 +848,7 @@ export function mergeChunkResults(chunksResults: any[], fileName: string, fileSi
     // 5. Flashcards
     if (res.flashcards) {
       res.flashcards.forEach((f: any) => {
+        if (!f.front || f.front.toLowerCase().includes("no flashcards") || f.front.toLowerCase().includes("no relevant information")) return;
         mergedFlashcards.push({
           chapter: chapterTitle,
           front: f.front,
@@ -755,6 +860,7 @@ export function mergeChunkResults(chunksResults: any[], fileName: string, fileSi
     // 6. Mock Questions
     if (res.mockQuestions) {
       res.mockQuestions.forEach((mq: any) => {
+        if (!mq.question || mq.question.toLowerCase().includes("no questions found") || mq.question.toLowerCase().includes("no relevant information")) return;
         const sec = (mq.section || "Section B").toUpperCase();
         if (sec.includes("A")) {
           mockTest.sectionA.push({ question: mq.question, idealAnswer: mq.idealAnswer });
