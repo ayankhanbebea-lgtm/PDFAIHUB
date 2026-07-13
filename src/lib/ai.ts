@@ -590,9 +590,13 @@ Return this exact JSON structure:
       const response = await generateWithAIWithBackoff(prompt, systemPrompt, provider);
       const latency = ((Date.now() - startTime) / 1000).toFixed(1) + 's';
       
+      console.log(`[DEBUG-AI-EXAM-RAW] COMPLETE AI response before parsing:\n`, response);
+      
       // Auto-repair JSON
       const cleanJson = repairJson(response);
       const parsed = JSON.parse(cleanJson);
+      
+      console.log(`[DEBUG-AI-EXAM-PARSED] Parsed JSON object:\n`, JSON.stringify(parsed, null, 2));
       
       // Clean and validate fields
       if (!parsed.chapterTitle || typeof parsed.chapterTitle !== 'string') {

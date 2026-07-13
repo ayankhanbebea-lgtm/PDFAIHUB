@@ -265,11 +265,15 @@ export async function POST(request: NextRequest) {
           // RAG Step 3: Merge all chunk results
           send({ type: 'status', message: 'Merging all sections and compiling metrics...' });
           const validResults = chunksResults.filter(Boolean);
+          console.log(`[DEBUG-API-EXAM-CHUNKS] Count of valid chunk results: ${validResults.length}`);
+          console.log(`[DEBUG-API-EXAM-CHUNKS] Chunk results:\n`, JSON.stringify(validResults, null, 2));
+
           if (validResults.length === 0) {
             throw new Error("We encountered a temporary processing issue. Please try again.");
           }
 
           const examData = mergeChunkResults(validResults, file.name, file.size);
+          console.log(`[DEBUG-API-EXAM-FINAL] Final API response JSON:\n`, JSON.stringify(examData, null, 2));
           
           const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1) + 's';
           examData.processingTime = totalDuration;
