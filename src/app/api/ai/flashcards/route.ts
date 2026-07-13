@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     let count = parseInt(formData.get('count') as string || '20');
+    if (isNaN(count) || count <= 0) count = 20;
     const provider = (formData.get('provider') as 'openai' | 'gemini' | 'groq') || 'groq';
     console.log(`[flashcards] Request — file: ${file?.name}, count: ${count}, provider: ${provider}`);
 

@@ -256,7 +256,7 @@ ${pdfContent.slice(0, 10000)}`;
   let currentModel = 'llama-3.3-70b-versatile';
   let attempts = 0;
   const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
-  const maxAttempts = isVercel ? 1 : 3;
+  const maxAttempts = isVercel ? 3 : 3;
   let delay = 2000;
 
   while (attempts < maxAttempts) {
@@ -272,12 +272,12 @@ ${pdfContent.slice(0, 10000)}`;
           messages,
           temperature: 0.3,
           max_tokens: 1000,
-        }, isVercel ? { timeout: 4000 } : undefined);
+        }, isVercel ? { timeout: 30000 } : undefined);
         return completion.choices[0]?.message?.content || 'I could not generate an answer at this moment.';
       } else {
         const model = getGemini().getGenerativeModel(
           { model: 'gemini-1.5-flash' },
-          isVercel ? { timeout: 5000 } : undefined
+          isVercel ? { timeout: 30000 } : undefined
         );
         const history = conversationHistory.map(m => ({
           role: m.role === 'user' ? 'user' : 'model',
@@ -321,7 +321,7 @@ ${pdfContent.slice(0, 10000)}`;
   try {
     const model = getGemini().getGenerativeModel(
       { model: 'gemini-1.5-flash' },
-      isVercel ? { timeout: 5000 } : undefined
+      isVercel ? { timeout: 30000 } : undefined
     );
     const result = await model.generateContent(`${systemPrompt}\n\nUser Question: ${question}`);
     return result.response.text();
@@ -431,7 +431,7 @@ export async function generateWithAIWithBackoff(
   let delay = 2000;
   let attempts = 0;
   const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
-  const maxAttempts = isVercel ? 1 : 5;
+  const maxAttempts = isVercel ? 3 : 5;
 
   while (attempts < maxAttempts) {
     try {
@@ -444,13 +444,13 @@ export async function generateWithAIWithBackoff(
           ],
           temperature: 0.5,
           max_tokens: 4096,
-        }, isVercel ? { timeout: 4000 } : undefined);
+        }, isVercel ? { timeout: 30000 } : undefined);
         const text = completion.choices[0]?.message?.content || '';
         return text;
       } else {
         const model = getGemini().getGenerativeModel(
           { model: 'gemini-1.5-flash' },
-          isVercel ? { timeout: 5000 } : undefined
+          isVercel ? { timeout: 30000 } : undefined
         );
         const result = await model.generateContent(`${systemPrompt}\n\n${prompt}`);
         return result.response.text();
@@ -494,7 +494,7 @@ export async function generateWithAIWithBackoff(
   console.warn(`[ai] Final fallback: Invoking Gemini...`);
   const model = getGemini().getGenerativeModel(
     { model: 'gemini-1.5-flash' },
-    isVercel ? { timeout: 5000 } : undefined
+    isVercel ? { timeout: 30000 } : undefined
   );
   const result = await model.generateContent(`${systemPrompt}\n\n${prompt}`);
   return result.response.text();
