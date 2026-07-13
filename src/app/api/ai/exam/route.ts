@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
             send({ type: 'timing', stage: 'OCR (if used)', durationMs: 0 });
           }
 
-          const wordsTotal = pages.reduce((acc, p) => acc + p.text.split(/\s+/).length, 0);
+          const wordsTotal = pages.reduce((acc, p) => acc + (p.text || '').split(/\s+/).length, 0);
           console.log(`[route] Extracted ${pages.length} pages, ${wordsTotal} words.`);
 
           if (pages.length === 0) {

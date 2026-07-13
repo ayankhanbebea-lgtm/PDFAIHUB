@@ -56,7 +56,11 @@ export function UploadProgress({
             <p className="font-medium text-gray-900 dark:text-white">
               {status === 'completed' ? 'Done!' : status === 'error' ? 'Failed' : status === 'uploading' ? 'Uploading...' : 'Processing...'}
             </p>
-            {message && <p className="text-sm text-gray-500 dark:text-gray-400">{message}</p>}
+            {message && (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {typeof message === 'string' ? message : ((message as any).message || JSON.stringify(message))}
+              </p>
+            )}
           </div>
         </div>
 

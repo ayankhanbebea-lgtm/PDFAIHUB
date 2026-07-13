@@ -47,7 +47,11 @@ export default function OCRPage() {
     } catch (err: any) {
       console.error(err);
       setStatus('error');
-      setMessage(err.response?.data?.error || 'OCR extraction failed.');
+      const rawErr = err.response?.data?.error;
+      const errorMsg = typeof rawErr === 'string'
+        ? rawErr
+        : (rawErr?.message || err.message || 'OCR extraction failed.');
+      setMessage(errorMsg);
       toast.error('Operation failed.');
     }
   };
