@@ -132,19 +132,75 @@ export default function ImageToPDFPage() {
     setSelectedIndices(nextSelected);
   };
 
+  // Compress a single image file client-side using canvas.
+  // Downscales images wider/taller than maxDim and re-encodes as JPEG.
+  const compressImage = (file: File, maxDim = 3000, quality = 0.85): Promise<File> => {
+    return new Promise((resolve) => {
+      // If already small enough, skip compression
+      if (file.size < 500 * 1024) {
+        resolve(file);
+        return;
+      }
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        const longest = Math.max(width, height);
+        if (longest > maxDim) {
+          const scale = maxDim / longest;
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(file); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob || blob.size > file.size) {
+              resolve(file); // Use original if compression made it bigger
+              return;
+            }
+            const compressed = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+            resolve(compressed);
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  };
+
   const handleConvert = async () => {
     if (!files.length) return toast.error('Please add at least one image');
 
     setStatus('uploading');
-    setProgress(10);
-    setMessage('Uploading images...');
+    setProgress(5);
+    setMessage('Preparing images...');
 
     try {
-      const formData = new FormData();
-      files.forEach((f) => formData.append('files', f));
-      formData.append('order', JSON.stringify(files.map((_, i) => i)));
+      // Compress all images client-side sequentially to keep memory usage low
+      const compressed: File[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = await compressImage(files[i]);
+        compressed.push(f);
+        setProgress(5 + Math.round((i + 1) / files.length * 45));
+        setMessage(`Preparing image ${i + 1} of ${files.length}...`);
+      }
 
       setProgress(50);
+      setMessage('Uploading images...');
+
+      const formData = new FormData();
+      compressed.forEach((f) => formData.append('files', f));
+      formData.append('order', JSON.stringify(compressed.map((_, i) => i)));
+
+      setProgress(60);
       setMessage('Converting to PDF...');
 
       const response = await fetch('/api/pdf/image-to-pdf', { method: 'POST', body: formData });
