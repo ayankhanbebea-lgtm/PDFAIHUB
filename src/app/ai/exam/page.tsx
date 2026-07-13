@@ -156,11 +156,16 @@ export default function AIExamModePage() {
         let lastY = -1;
         
         for (const item of textContent.items) {
-          if (lastY !== -1 && item.transform[5] !== lastY) {
-            pageText += '\n';
+          if (!item) continue;
+          const transform = (item as any).transform;
+          const str = (item as any).str || '';
+          if (transform && transform[5] !== undefined) {
+            if (lastY !== -1 && transform[5] !== lastY) {
+              pageText += '\n';
+            }
+            lastY = transform[5];
           }
-          pageText += item.str;
-          lastY = item.transform[5];
+          pageText += str;
         }
         
         extractedPages.push({

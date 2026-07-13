@@ -245,8 +245,7 @@ export async function extractWithOCR(pdfBuffer: Buffer): Promise<string> {
 
     if (isPdf) {
       // Render PDF pages to JPEG buffers using MuPDF
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const mupdf = await import('mupdf');
+      const mupdf = eval('require')('mupdf');
       const doc = mupdf.Document.openDocument(pdfBuffer, 'application/pdf');
       const pageCount = doc.countPages();
       console.log(`[pdf-ai] OCR: rendering ${pageCount} pages using MuPDF...`);
