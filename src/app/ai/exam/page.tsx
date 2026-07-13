@@ -426,15 +426,18 @@ export default function AIExamModePage() {
 
   // Helper lists
   const uniqueFlashcardChapters = useMemo(() => {
-    return ['All', ...new Set((examPackage?.flashcards || []).map((c: any) => c.chapter).filter(Boolean) as string[])];
+    const list = Array.isArray(examPackage?.flashcards) ? examPackage.flashcards : [];
+    return ['All', ...new Set(list.map((c: any) => c.chapter).filter(Boolean) as string[])];
   }, [examPackage?.flashcards]);
 
   const filteredMcqs = useMemo(() => {
-    return (examPackage?.mcqs || []).filter((m: any) => mcqFilter === 'All' || m.difficulty === mcqFilter);
+    const list = Array.isArray(examPackage?.mcqs) ? examPackage.mcqs : [];
+    return list.filter((m: any) => mcqFilter === 'All' || m.difficulty === mcqFilter);
   }, [examPackage?.mcqs, mcqFilter]);
 
   const filteredFlashcards = useMemo(() => {
-    return (examPackage?.flashcards || []).filter((c: any) => flashcardChapterFilter === 'All' || c.chapter === flashcardChapterFilter);
+    const list = Array.isArray(examPackage?.flashcards) ? examPackage.flashcards : [];
+    return list.filter((c: any) => flashcardChapterFilter === 'All' || c.chapter === flashcardChapterFilter);
   }, [examPackage?.flashcards, flashcardChapterFilter]);
 
   return (

@@ -13,6 +13,11 @@ import { PDFDocument } from 'pdf-lib';
 import zlib from 'zlib';
 import { promisify } from 'util';
 
+// Hint for Vercel Next File Tracer to bundle the native/WASM dependencies of mupdf:
+if (false) {
+  import('mupdf');
+}
+
 const inflate = promisify(zlib.inflate);
 const inflateRaw = promisify(zlib.inflateRaw);
 
