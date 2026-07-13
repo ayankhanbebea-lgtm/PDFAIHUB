@@ -55,6 +55,30 @@ export async function POST(request: NextRequest) {
     }, { status: 400 });
   }
 
+  const checkOnly = formData.get('checkOnly') === 'true';
+  const imageCount = parseInt(formData.get('imageCount') as string || '0');
+
+  if (checkOnly) {
+    if (session?.user?.id) {
+      await incrementUsage(session.user.id, 'pdf');
+      await logUsage(session.user.id, 'jpg_to_pdf', { imageCount });
+      await prisma.file.create({
+        data: {
+          userId: session.user.id,
+          name: `jpg-converted-${Date.now()}.pdf`,
+          originalName: 'images.zip',
+          size: 0,
+          mimeType: 'application/pdf',
+          url: 'local',
+          tool: 'jpg-to-pdf',
+          status: 'COMPLETED',
+          resultSize: 0,
+        },
+      });
+    }
+    return NextResponse.json({ success: true });
+  }
+
   const files = formData.getAll('files') as File[];
   const orderJson = formData.get('order') as string;
   const order: number[] = orderJson ? JSON.parse(orderJson) : files.map((_, i) => i);

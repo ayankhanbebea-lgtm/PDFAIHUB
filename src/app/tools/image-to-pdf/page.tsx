@@ -181,49 +181,81 @@ export default function ImageToPDFPage() {
 
     setStatus('uploading');
     setProgress(5);
-    setMessage('Preparing images...');
+    setMessage('Validating access and usage limits...');
 
     try {
-      // Compress all images client-side sequentially to keep memory usage low
-      const compressed: File[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const f = await compressImage(files[i]);
-        compressed.push(f);
-        setProgress(5 + Math.round((i + 1) / files.length * 45));
-        setMessage(`Preparing image ${i + 1} of ${files.length}...`);
-      }
+      // 1. Validate limits and check access with a lightweight request (checkOnly)
+      const form = new FormData();
+      form.append('checkOnly', 'true');
+      form.append('imageCount', String(files.length));
 
-      setProgress(50);
-      setMessage('Uploading images...');
+      const checkResponse = await fetch('/api/pdf/image-to-pdf', { method: 'POST', body: form });
 
-      const formData = new FormData();
-      compressed.forEach((f) => formData.append('files', f));
-      formData.append('order', JSON.stringify(compressed.map((_, i) => i)));
-
-      setProgress(60);
-      setMessage('Converting to PDF...');
-
-      const response = await fetch('/api/pdf/image-to-pdf', { method: 'POST', body: formData });
-
-      if (!response.ok) {
-        let errMsg = 'Conversion failed';
+      if (!checkResponse.ok) {
+        let errMsg = 'Failed limit check';
         try {
-          const err = await response.json();
-          errMsg = err.error || err.message || (err.stack ? `${err.error}\n${err.stack}` : JSON.stringify(err));
+          const err = await checkResponse.json();
+          errMsg = err.error || err.message || JSON.stringify(err);
         } catch {
           try {
-            const txt = await response.text();
+            const txt = await checkResponse.text();
             const match = txt.match(/<title>([\s\S]*?)<\/title>/i);
             const title = match ? match[1].trim() : '';
-            errMsg = `Server error (${response.status} ${response.statusText}): ${title || txt.substring(0, 150)}`;
+            errMsg = `Server error (${checkResponse.status} ${checkResponse.statusText}): ${title || txt.substring(0, 150)}`;
           } catch {
-            errMsg = `Server error (${response.status} ${response.statusText})`;
+            errMsg = `Server error (${checkResponse.status} ${checkResponse.statusText})`;
           }
         }
         throw new Error(errMsg);
       }
 
-      const blob = await response.blob();
+      // 2. Compress and resize images client-side sequentially
+      const compressed: File[] = [];
+      for (let i = 0; i < files.length; i++) {
+        setProgress(10 + Math.round((i / files.length) * 40));
+        setMessage(`Processing image ${i + 1} of ${files.length}...`);
+        const f = await compressImage(files[i]);
+        compressed.push(f);
+      }
+
+      setProgress(50);
+      setMessage('Importing PDF engine...');
+
+      // 3. Import pdf-lib dynamically to avoid hydration or SSR issues
+      const { PDFDocument } = await import('pdf-lib');
+      const doc = await PDFDocument.create();
+
+      // 4. Sequentially embed images into the PDF document in browser memory
+      for (let i = 0; i < compressed.length; i++) {
+        setProgress(55 + Math.round((i / compressed.length) * 35));
+        setMessage(`Generating PDF pages: ${i + 1} of ${compressed.length}...`);
+
+        const file = compressed[i];
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = new Uint8Array(arrayBuffer);
+
+        let image;
+        if (file.type === 'image/png') {
+          image = await doc.embedPng(buffer);
+        } else {
+          // Fallback to JPEG for jpeg, jpg, webp (which got compressed to jpeg)
+          image = await doc.embedJpg(buffer);
+        }
+
+        const page = doc.addPage([image.width, image.height]);
+        page.drawImage(image, {
+          x: 0,
+          y: 0,
+          width: image.width,
+          height: image.height,
+        });
+      }
+
+      setProgress(90);
+      setMessage('Compiling final PDF...');
+
+      const pdfBytes = await doc.save();
+      const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
 
       setProgress(100);

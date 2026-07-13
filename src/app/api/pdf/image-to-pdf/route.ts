@@ -54,6 +54,17 @@ export async function POST(request: NextRequest) {
     }, { status: 400 });
   }
 
+  const checkOnly = formData.get('checkOnly') === 'true';
+  const imageCount = parseInt(formData.get('imageCount') as string || '0');
+
+  if (checkOnly) {
+    if (session?.user?.id) {
+      await incrementUsage(session.user.id, 'pdf');
+      await logUsage(session.user.id, 'image_to_pdf', { imageCount });
+    }
+    return NextResponse.json({ success: true });
+  }
+
   const files = formData.getAll('files') as File[];
   const orderJson = formData.get('order') as string;
   const order: number[] = orderJson ? JSON.parse(orderJson) : files.map((_, i) => i);
