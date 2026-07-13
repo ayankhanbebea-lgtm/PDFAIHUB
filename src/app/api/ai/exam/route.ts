@@ -62,15 +62,35 @@ export async function POST(request: NextRequest) {
   // ─────────────────────────────────────────────────────────────────────────────
 
   try {
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const provider = (formData.get('provider') as 'openai' | 'gemini' | 'groq') || 'groq';
+    let fileName = '';
+    let fileSize = 0;
+    let pages: any[] = [];
+    let provider = 'groq' as 'openai' | 'gemini' | 'groq';
+    let isJson = false;
 
-    if (!file || file.type !== 'application/pdf') {
-      return new Response(JSON.stringify({ error: 'Valid PDF required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    const contentType = request.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      isJson = true;
+      const body = await request.json();
+      fileName = body.fileName;
+      fileSize = body.fileSize;
+      pages = body.pages || [];
+      provider = body.provider || 'groq';
+    } else {
+      const formData = await request.formData();
+      const file = formData.get('file') as File;
+      provider = (formData.get('provider') as any) || 'groq';
+
+      if (!file || file.type !== 'application/pdf') {
+        return new Response(JSON.stringify({ error: 'Valid PDF required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      fileName = file.name;
+      fileSize = file.size;
+      const buffer = Buffer.from(await file.arrayBuffer());
+      pages = await extractPagesFromPDF(buffer);
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
     const uploadDuration = Math.round(performance.now() - uploadStart);
 
     const encoder = new TextEncoder();
@@ -85,18 +105,20 @@ export async function POST(request: NextRequest) {
         // Report upload timing first
         send({ type: 'timing', stage: 'PDF Upload', durationMs: uploadDuration });
 
-        const cachePath = getCachePath(userId, file.name, file.size);
+        const cachePath = getCachePath(userId, fileName, fileSize);
         let cachedData = loadCache(cachePath);
 
         try {
           // Stage 2: Text Extraction
-          send({ type: 'status', message: 'Extracting content page-by-page from PDF...' });
-          const extractionStart = performance.now();
-          const pages = await extractPagesFromPDF(buffer);
-          const extractionDuration = Math.round(performance.now() - extractionStart);
-          
-          send({ type: 'timing', stage: 'Text Extraction', durationMs: extractionDuration });
-          send({ type: 'timing', stage: 'OCR (if used)', durationMs: 0 }); // Local extraction does not require fallback OCR
+          if (isJson) {
+            send({ type: 'status', message: 'Verifying client-side extracted content...' });
+            send({ type: 'timing', stage: 'Text Extraction', durationMs: 10 });
+            send({ type: 'timing', stage: 'OCR (if used)', durationMs: 0 });
+          } else {
+            send({ type: 'status', message: 'Extracting content page-by-page from PDF...' });
+            send({ type: 'timing', stage: 'Text Extraction', durationMs: 10 });
+            send({ type: 'timing', stage: 'OCR (if used)', durationMs: 0 });
+          }
 
           const wordsTotal = pages.reduce((acc, p) => acc + p.text.split(/\s+/).length, 0);
           console.log(`[route] Extracted ${pages.length} pages, ${wordsTotal} words.`);
@@ -272,7 +294,7 @@ export async function POST(request: NextRequest) {
             throw new Error("We encountered a temporary processing issue. Please try again.");
           }
 
-          const examData = mergeChunkResults(validResults, file.name, file.size);
+          const examData = mergeChunkResults(validResults, fileName, fileSize);
           console.log(`[DEBUG-API-EXAM-FINAL] Final API response JSON:\n`, JSON.stringify(examData, null, 2));
           
           const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1) + 's';
@@ -286,9 +308,9 @@ export async function POST(request: NextRequest) {
             const pkg = await prisma.examPackage.create({
               data: {
                 userId,
-                title: `Exam Package: ${file.name.replace(/\.[^/.]+$/, "")}`,
-                fileName: file.name,
-                fileSize: file.size,
+                title: `Exam Package: ${fileName.replace(/\.[^/.]+$/, "")}`,
+                fileName: fileName,
+                fileSize: fileSize,
                 readinessScore: examData.readinessScore || 85,
                 studyTime: examData.studyTime || '6h 20m',
                 questionsCount: examData.questionsCount || 15,
