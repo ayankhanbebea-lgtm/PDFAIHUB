@@ -131,8 +131,20 @@ export async function POST(request: NextRequest) {
           
           send({ type: 'timing', stage: 'Chunking', durationMs: chunkingDuration });
 
-          const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
-          const chunksToProcess = isVercel ? initialChunks.slice(0, 1) : initialChunks;
+          const chunksToProcess = initialChunks;
+
+          // Calculate total text length across all pages
+          const totalTextLength = pages.reduce((acc, p) => acc + p.text.length, 0);
+          console.log(`[DEBUG-EXAM-MODE] Total PDF pages processed: ${pages.length}`);
+          console.log(`[DEBUG-EXAM-MODE] Total extracted text length: ${totalTextLength} characters`);
+          console.log(`[DEBUG-EXAM-MODE] Total chunks created: ${chunksToProcess.length}`);
+
+          // Log chunk truncation check
+          chunksToProcess.forEach((chunk, index) => {
+            const isTruncated = chunk.text.length > 12000;
+            console.log(`[DEBUG-EXAM-MODE] Chunk ${index + 1}/${chunksToProcess.length} (Pages ${chunk.startPage}-${chunk.endPage}): ` +
+              `Length: ${chunk.text.length} characters, will be truncated to 12000: ${isTruncated}`);
+          });
 
           send({
             type: 'status',
