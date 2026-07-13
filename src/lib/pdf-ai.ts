@@ -240,11 +240,32 @@ export async function extractWithOCR(pdfBuffer: Buffer): Promise<string> {
   });
 
   try {
-    // Extract embedded image streams from the PDF
-    const images = await extractEmbeddedImages(pdfBuffer);
+    const images: Buffer[] = [];
+    const isPdf = pdfBuffer.slice(0, 4).toString() === '%PDF';
+
+    if (isPdf) {
+      // Render PDF pages to JPEG buffers using MuPDF
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mupdf = await import('mupdf');
+      const doc = mupdf.Document.openDocument(pdfBuffer, 'application/pdf');
+      const pageCount = doc.countPages();
+      console.log(`[pdf-ai] OCR: rendering ${pageCount} pages using MuPDF...`);
+      for (let i = 0; i < pageCount; i++) {
+        const page = doc.loadPage(i);
+        const scaleMatrix = mupdf.Matrix.scale(1.5, 1.5);
+        const pixmap = page.toPixmap(scaleMatrix, mupdf.ColorSpace.DeviceRGB);
+        const jpegBytes = pixmap.asJPEG(85);
+        images.push(Buffer.from(jpegBytes));
+      }
+      console.log(`[pdf-ai] OCR: successfully rendered ${images.length} pages.`);
+    } else {
+      // Direct raw image file upload (PNG/JPEG)
+      images.push(pdfBuffer);
+      console.log(`[pdf-ai] OCR: processing raw image upload directly.`);
+    }
 
     if (images.length === 0) {
-      console.log('[pdf-ai] OCR: no embedded raster images found in PDF');
+      console.log('[pdf-ai] OCR: no images to process');
       await worker.terminate();
       return '';
     }
@@ -263,25 +284,6 @@ export async function extractWithOCR(pdfBuffer: Buffer): Promise<string> {
     await worker.terminate();
     throw e;
   }
-}
-
-// ─── Extract embedded raster images from a PDF (for scanned PDFs) ─────────────
-async function extractEmbeddedImages(pdfBuffer: Buffer): Promise<Buffer[]> {
-  const images: Buffer[] = [];
-  const rawPDF = pdfBuffer.toString('latin1');
-
-  // Look for image XObjects (typical in scanned PDFs)
-  const xobjRegex = /\/Subtype\s*\/Image[\s\S]*?stream([\s\S]*?)endstream/g;
-  let match;
-  while ((match = xobjRegex.exec(rawPDF)) !== null) {
-    const imgData = Buffer.from(match[1].replace(/^\r?\n/, ''), 'latin1');
-    if (imgData.length > 2000) {
-      images.push(imgData);
-    }
-  }
-
-  console.log(`[pdf-ai] OCR: found ${images.length} embedded image streams`);
-  return images;
 }
 
 // ─── Detect if PDF has selectable text ────────────────────────────────────────
