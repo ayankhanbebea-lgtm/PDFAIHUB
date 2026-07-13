@@ -10,7 +10,18 @@ import prisma from '@/lib/prisma';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+function getMemInfo() {
+  const mem = process.memoryUsage();
+  return {
+    rss: `${(mem.rss / 1024 / 1024).toFixed(2)} MB`,
+    heapTotal: `${(mem.heapTotal / 1024 / 1024).toFixed(2)} MB`,
+    heapUsed: `${(mem.heapUsed / 1024 / 1024).toFixed(2)} MB`,
+    external: `${(mem.external / 1024 / 1024).toFixed(2)} MB`,
+  };
+}
+
 export async function POST(request: NextRequest) {
+  console.log('[DEBUG-JPG-TO-PDF] Start processing POST request');
   const session = await getServerSession(authOptions);
 
   if (session?.user?.id) {
@@ -30,14 +41,38 @@ export async function POST(request: NextRequest) {
     incrementGuestUsage(id);
   }
 
+  const memoryBefore = getMemInfo();
+  let formData;
   try {
-    const formData = await request.formData();
-    const files = formData.getAll('files') as File[];
-    const orderJson = formData.get('order') as string;
-    const order: number[] = orderJson ? JSON.parse(orderJson) : files.map((_, i) => i);
+    formData = await request.formData();
+  } catch (e: any) {
+    console.error('[DEBUG-JPG-TO-PDF] Request parsing failed:', e.message);
+    return NextResponse.json({
+      error: `Failed to parse upload body: ${e.message}`,
+      stack: e.stack,
+      phase: 'parsing_request_body',
+      memory: getMemInfo()
+    }, { status: 400 });
+  }
 
-    if (!files?.length) return NextResponse.json({ error: 'At least one JPG image required' }, { status: 400 });
+  const files = formData.getAll('files') as File[];
+  const orderJson = formData.get('order') as string;
+  const order: number[] = orderJson ? JSON.parse(orderJson) : files.map((_, i) => i);
 
+  if (!files?.length) {
+    return NextResponse.json({ error: 'At least one JPG image required' }, { status: 400 });
+  }
+
+  const totalBytes = files.reduce((acc, f) => acc + f.size, 0);
+  const totalMB = (totalBytes / 1024 / 1024).toFixed(2);
+  const individualSizes = files.map(f => `${f.name}: ${(f.size / 1024 / 1024).toFixed(2)} MB`);
+
+  console.log('[DEBUG-JPG-TO-PDF] Number of uploaded images:', files.length);
+  console.log('[DEBUG-JPG-TO-PDF] Total upload size (MB):', totalMB);
+  console.log('[DEBUG-JPG-TO-PDF] Individual image sizes:', individualSizes);
+  console.log('[DEBUG-JPG-TO-PDF] Memory usage before processing:', memoryBefore);
+
+  try {
     const ACCEPTED = ['image/jpeg', 'image/jpg'];
     for (const file of files) {
       if (!ACCEPTED.includes(file.type) && !file.name.match(/\.(jpg|jpeg)$/i)) {
@@ -46,14 +81,58 @@ export async function POST(request: NextRequest) {
     }
 
     const orderedFiles = order.map((i) => files[i]);
-    const imageBuffers = await Promise.all(
-      orderedFiles.map(async (file) => {
-        const buffer = Buffer.from(await file.arrayBuffer());
-        return { buffer, mimeType: 'image/jpeg' };
-      })
-    );
+    let sharp: any;
+    try { sharp = (await import('sharp')).default; } catch {}
 
-    const pdfBuffer = await imagesToPDF(imageBuffers);
+    const { PDFDocument } = await import('pdf-lib');
+    const doc = await PDFDocument.create();
+
+    const memoryDuring: any[] = [];
+
+    // Process images sequentially
+    for (let idx = 0; idx < orderedFiles.length; idx++) {
+      const file = orderedFiles[idx];
+      const memBeforeImg = getMemInfo();
+
+      try {
+        let buffer = Buffer.from(await file.arrayBuffer());
+        let mimeType = 'image/jpeg';
+
+        // Limit size on the backend too
+        if (sharp) {
+          const meta = await sharp(buffer).metadata();
+          const longest = Math.max(meta.width ?? 0, meta.height ?? 0);
+          if (longest > 3000) {
+            buffer = await sharp(buffer)
+              .resize({ width: 3000, height: 3000, fit: 'inside', withoutEnlargement: true })
+              .toBuffer();
+          }
+        }
+
+        const image = await doc.embedJpg(buffer);
+        const page = doc.addPage([image.width, image.height]);
+        page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+      } catch (e: any) {
+        console.error(`[DEBUG-JPG-TO-PDF] Error processing ${file.name} at index ${idx}:`, e.message);
+        throw new Error(`Failed to embed image "${file.name}" at index ${idx}: ${e.message}\nStack: ${e.stack}`);
+      }
+
+      const memAfterImg = getMemInfo();
+      memoryDuring.push({
+        index: idx,
+        name: file.name,
+        size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        memBefore: memBeforeImg,
+        memAfter: memAfterImg
+      });
+    }
+
+    console.log('[DEBUG-JPG-TO-PDF] Saving PDF document...');
+    const pdfBuffer = Buffer.from(await doc.save());
+    const memoryAfter = getMemInfo();
+
+    console.log('[DEBUG-JPG-TO-PDF] PDF generated. Size:', (pdfBuffer.length / 1024 / 1024).toFixed(2), 'MB');
+    console.log('[DEBUG-JPG-TO-PDF] Memory usage after processing:', memoryAfter);
 
     if (session?.user?.id) {
       await incrementUsage(session.user.id, 'pdf');
@@ -83,8 +162,19 @@ export async function POST(request: NextRequest) {
         'Content-Length': String(pdfBuffer.length),
       },
     });
-  } catch (error) {
-    console.error('JPG to PDF error:', error);
-    return NextResponse.json({ error: 'Failed to convert JPG to PDF' }, { status: 500 });
+  } catch (error: any) {
+    const errorMem = getMemInfo();
+    console.error('[DEBUG-JPG-TO-PDF] Exception occurred:', error.message);
+    console.error(error.stack);
+    return NextResponse.json({
+      error: error.message || 'Failed to convert JPG to PDF',
+      stack: error.stack,
+      numImages: files.length,
+      totalMB,
+      individualSizes,
+      memoryBefore,
+      memoryAfter: errorMem
+    }, { status: 500 });
   }
 }
+

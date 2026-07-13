@@ -33,26 +33,95 @@ export default function JPGToPDFPage() {
     setPreviews(reorderedPreviews);
   };
 
+  // Compress a single JPG/JPEG image file client-side using canvas.
+  // Downscales images wider/taller than maxDim and re-encodes as JPEG.
+  const compressImage = (file: File, maxDim = 3000, quality = 0.85): Promise<File> => {
+    return new Promise((resolve) => {
+      // If already small enough, skip compression
+      if (file.size < 500 * 1024) {
+        resolve(file);
+        return;
+      }
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        const longest = Math.max(width, height);
+        if (longest > maxDim) {
+          const scale = maxDim / longest;
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(file); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob || blob.size > file.size) {
+              resolve(file); // Use original if compression made it bigger
+              return;
+            }
+            const compressed = new File([blob], file.name, { type: 'image/jpeg' });
+            resolve(compressed);
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  };
+
   const handleConvert = async () => {
     if (!files.length) return toast.error('Please add at least one JPG image');
 
     setStatus('uploading');
-    setProgress(15);
-    setMessage('Uploading images...');
+    setProgress(5);
+    setMessage('Preparing JPG images...');
 
     try {
-      const formData = new FormData();
-      files.forEach((f) => formData.append('files', f));
-      formData.append('order', JSON.stringify(files.map((_, i) => i)));
+      // Compress all JPG images client-side sequentially to keep memory usage low
+      const compressed: File[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = await compressImage(files[i]);
+        compressed.push(f);
+        setProgress(5 + Math.round((i + 1) / files.length * 45));
+        setMessage(`Preparing image ${i + 1} of ${files.length}...`);
+      }
 
       setProgress(50);
+      setMessage('Uploading JPG images...');
+
+      const formData = new FormData();
+      compressed.forEach((f) => formData.append('files', f));
+      formData.append('order', JSON.stringify(compressed.map((_, i) => i)));
+
+      setProgress(60);
       setMessage('Converting to PDF...');
 
       const response = await fetch('/api/pdf/jpg-to-pdf', { method: 'POST', body: formData });
 
       if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: 'Conversion failed' }));
-        throw new Error(err.error || 'Conversion failed');
+        let errMsg = 'Conversion failed';
+        try {
+          const err = await response.json();
+          errMsg = err.error || err.message || (err.stack ? `${err.error}\n${err.stack}` : JSON.stringify(err));
+        } catch {
+          try {
+            const txt = await response.text();
+            const match = txt.match(/<title>([\s\S]*?)<\/title>/i);
+            const title = match ? match[1].trim() : '';
+            errMsg = `Server error (${response.status} ${response.statusText}): ${title || txt.substring(0, 150)}`;
+          } catch {
+            errMsg = `Server error (${response.status} ${response.statusText})`;
+          }
+        }
+        throw new Error(errMsg);
       }
 
       const blob = await response.blob();
