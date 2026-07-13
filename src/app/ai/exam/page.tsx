@@ -118,78 +118,101 @@ export default function AIExamModePage() {
 
     try {
       const file = files[0];
+      const isLargeFile = file.size > 4 * 1024 * 1024; // 4MB limit
       
-      // Load PDF.js from cdnjs dynamically
-      const pdfjsLib = await new Promise<any>((resolve, reject) => {
-        if ((window as any).pdfjsLib) {
-          resolve((window as any).pdfjsLib);
-          return;
-        }
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';
-        script.onload = () => {
-          const pdfjs = (window as any).pdfjsLib;
-          pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-          resolve(pdfjs);
-        };
-        script.onerror = () => reject(new Error('Failed to load PDF parser from CDN'));
-        document.head.appendChild(script);
-      });
-
-      setStatusMsg('Reading PDF structure...');
-      setProgressVal(6);
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      const numPages = pdf.numPages;
-      setPageCount(numPages);
-
-      setStatusMsg(`Extracting text page-by-page (0/${numPages})...`);
-      const extractedPages: Array<{ pageNumber: number; text: string }> = [];
+      let response;
       
-      for (let i = 1; i <= numPages; i++) {
-        setStatusMsg(`Extracting text page-by-page (${i}/${numPages})...`);
-        setProgressVal(6 + Math.round((i / numPages) * 14)); // scale extraction progress to ~20%
+      if (isLargeFile) {
+        setStatusMsg('Loading PDF parser in browser...');
+        setProgressVal(3);
         
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        let pageText = '';
-        let lastY = -1;
-        
-        for (const item of textContent.items) {
-          if (!item) continue;
-          const transform = (item as any).transform;
-          const str = (item as any).str || '';
-          if (transform && transform[5] !== undefined) {
-            if (lastY !== -1 && transform[5] !== lastY) {
-              pageText += '\n';
-            }
-            lastY = transform[5];
+        // Load PDF.js from cdnjs dynamically
+        const pdfjsLib = await new Promise<any>((resolve, reject) => {
+          if ((window as any).pdfjsLib) {
+            resolve((window as any).pdfjsLib);
+            return;
           }
-          pageText += str;
-        }
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';
+          script.onload = () => {
+            const pdfjs = (window as any).pdfjsLib;
+            pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+            resolve(pdfjs);
+          };
+          script.onerror = () => reject(new Error('Failed to load PDF parser from CDN'));
+          document.head.appendChild(script);
+        });
+
+        setStatusMsg('Reading PDF structure...');
+        setProgressVal(6);
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const numPages = pdf.numPages;
+        setPageCount(numPages);
+
+        setStatusMsg(`Extracting text page-by-page (0/${numPages})...`);
+        const extractedPages: Array<{ pageNumber: number; text: string }> = [];
         
-        extractedPages.push({
-          pageNumber: i,
-          text: pageText.trim()
+        for (let i = 1; i <= numPages; i++) {
+          setStatusMsg(`Extracting text page-by-page (${i}/${numPages})...`);
+          setProgressVal(6 + Math.round((i / numPages) * 14)); // scale extraction progress to ~20%
+          
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          let pageText = '';
+          let lastY = -1;
+          
+          for (const item of textContent.items) {
+            if (!item) continue;
+            const transform = (item as any).transform;
+            const str = (item as any).str || '';
+            if (transform && transform[5] !== undefined) {
+              if (lastY !== -1 && transform[5] !== lastY) {
+                pageText += '\n';
+              }
+              lastY = transform[5];
+            }
+            pageText += str;
+          }
+          
+          extractedPages.push({
+            pageNumber: i,
+            text: pageText.trim()
+          });
+        }
+
+        setStatusMsg('Sending extracted text to server...');
+        setProgressVal(22);
+
+        response = await fetch('/api/ai/exam', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone
+          },
+          body: JSON.stringify({
+            fileName: file.name,
+            fileSize: file.size,
+            pages: extractedPages,
+            provider: provider
+          }),
+        });
+      } else {
+        setStatusMsg('Uploading file and initializing stream...');
+        setProgressVal(5);
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('provider', provider);
+
+        response = await fetch('/api/ai/exam', {
+          method: 'POST',
+          headers: {
+            'x-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone
+          },
+          body: formData,
         });
       }
-
-      setStatusMsg('Sending extracted text to server...');
-      setProgressVal(22);
-
-      const response = await fetch('/api/ai/exam', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone
-        },
-        body: JSON.stringify({
-          fileName: file.name,
-          fileSize: file.size,
-          pages: extractedPages,
-          provider: provider
-        }),
-      });
 
       if (!response.ok) {
         if (response.status === 403 || response.status === 429) {
