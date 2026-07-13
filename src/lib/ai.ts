@@ -663,23 +663,8 @@ Return this exact JSON structure:
       attempt++;
       console.warn(`[generateExamChunk] Attempt ${attempt} failed for Chunk ${chunk.chunkIndex}:`, err.message);
       if (attempt > retryCount) {
-        // Return a mock fallback exam chunk instead of throwing
-        console.warn(`[generateExamChunk] Retry limit reached, returning mock fallback for pages ${chunk.startPage}-${chunk.endPage}`);
-        return {
-          chapterTitle: `Pages ${chunk.startPage}-${chunk.endPage} (Fallback Summary)`,
-          smartNotes: {
-            bulletPoints: [`Review content in original textbook on pages ${chunk.startPage}-${chunk.endPage}.`],
-            definitions: [],
-            formulas: [],
-            examples: [],
-            examTips: []
-          },
-          importantTopics: [],
-          pyqQuestions: [],
-          mcqs: [],
-          flashcards: [],
-          mockQuestions: []
-        };
+        console.warn(`[generateExamChunk] Retry limit reached for pages ${chunk.startPage}-${chunk.endPage}, throwing error to trigger adaptive slicing...`);
+        throw err;
       }
     }
   }
