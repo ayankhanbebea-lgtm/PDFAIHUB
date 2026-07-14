@@ -584,7 +584,7 @@ export async function generateWithAIWithBackoff(
             { role: 'user',   content: prompt },
           ],
           temperature: 0.5,
-          max_tokens: 8192,
+          max_tokens: currentModel === 'llama-3.1-8b-instant' ? 4000 : 8192,
         }, isVercel ? { timeout: 30000 } : undefined);
         const text = completion.choices[0]?.message?.content || '';
         return text;
@@ -615,12 +615,15 @@ export async function generateWithAIWithBackoff(
         break;
       }
 
-      const isRateLimit = err.status === 429 || err.message?.includes('429') || err.message?.includes('rate limit') || err.message?.includes('TPM') || err.message?.includes('RPM');
+      const isRateLimit = err.status === 429 || err.message?.includes('429') || err.message?.includes('rate limit') || err.message?.includes('TPM') || err.message?.includes('RPM') || err.message?.includes('TPD');
+      const isTpdLimit = err.message?.includes('TPD') || err.message?.includes('tokens per day');
 
       if (isRateLimit) {
-        if (attempts >= 2 && currentModel === 'llama-3.3-70b-versatile') {
-          console.warn(`[ai] FALLBACK: Switching model to llama-3.1-8b-instant`);
-          currentModel = 'llama-3.1-8b-instant';
+        if (isTpdLimit || attempts >= 2) {
+          if (currentModel === 'llama-3.3-70b-versatile') {
+            console.warn(`[ai] FALLBACK: Switching model to llama-3.1-8b-instant due to rate limit`);
+            currentModel = 'llama-3.1-8b-instant';
+          }
         }
         await new Promise(resolve => setTimeout(resolve, delay));
         delay = Math.min(delay * 2, 30000); // cap at 30s
