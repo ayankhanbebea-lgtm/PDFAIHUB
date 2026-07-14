@@ -236,16 +236,62 @@ export async function extractTextFromPDF(pdfBuffer: Buffer): Promise<string> {
 
 // ─── OCR using Tesseract.js (for scanned/image PDFs) ─────────────────────────
 export async function extractWithOCR(pdfBuffer: Buffer): Promise<string> {
+  // ── Strategy A: Proxy to Render backend (production/Vercel) ──────────────
+  // Vercel serverless lambdas cannot run mupdf (ESM top-level await) or cache
+  // Tesseract language data. The Render backend is a Docker container that has
+  // full filesystem access and can run these natively.
+  if (process.env.CONVERSION_BACKEND_URL) {
+    console.log('[pdf-ai] OCR: proxying to Render backend for OCR extraction...');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const axios = require('axios');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const FormData = require('form-data');
+
+    const form = new FormData();
+    form.append('file', pdfBuffer, { filename: 'input.pdf', contentType: 'application/pdf' });
+
+    const response = await axios.post(
+      `${process.env.CONVERSION_BACKEND_URL}/ocr`,
+      form,
+      {
+        headers: form.getHeaders(),
+        responseType: 'json',
+        timeout: 110000,
+      }
+    );
+
+    const text = response.data?.text;
+    if (typeof text !== 'string') {
+      throw new Error(`OCR backend returned unexpected response: ${JSON.stringify(response.data)}`);
+    }
+    console.log(`[pdf-ai] OCR: backend returned ${text.length} chars`);
+    return text;
+  }
+
+  // ── Strategy B: Spawn local child process (dev/localhost only) ────────────
+  // This uses run-ocr.mjs which runs as a native ESM module and can import
+  // mupdf (WASM top-level await) without Webpack/Next.js CommonJS restrictions.
+  console.log('[pdf-ai] OCR: no CONVERSION_BACKEND_URL, spawning local child process...');
   const tempDir = os.tmpdir();
-  const inputPath = path.join(tempDir, `ocr-input-${Date.now()}-${Math.random().toString(36).substring(2)}.pdf`);
-  const outputPath = path.join(tempDir, `ocr-output-${Date.now()}-${Math.random().toString(36).substring(2)}.txt`);
+  const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substring(2)}`;
+  const inputPath = path.join(tempDir, `ocr-input-${uniqueSuffix}.pdf`);
+  const outputPath = path.join(tempDir, `ocr-output-${uniqueSuffix}.txt`);
+
+  // Collect stderr for better diagnostics on failure
+  const stderrLines: string[] = [];
 
   try {
-    console.log(`[pdf-ai] OCR: Writing buffer to temp input path: ${inputPath}`);
+    console.log(`[pdf-ai] OCR: Writing buffer to temp input: ${inputPath}`);
     fs.writeFileSync(inputPath, pdfBuffer);
 
-    const scriptPath = path.join(process.cwd(), 'src/app/api/pdf/ocr/run-ocr.mjs');
-    console.log(`[pdf-ai] OCR: Spawning node child process with script: ${scriptPath}`);
+    // Try __dirname-relative path first (works after Next.js compilation)
+    // Fall back to process.cwd()-relative (works in tsx/ts-node dev mode)
+    const possiblePaths = [
+      path.join(__dirname, 'run-ocr.mjs'),
+      path.join(process.cwd(), 'src/app/api/pdf/ocr/run-ocr.mjs'),
+    ];
+    const scriptPath = possiblePaths.find(p => fs.existsSync(p)) ?? possiblePaths[1];
+    console.log(`[pdf-ai] OCR: Spawning child process: ${scriptPath}`);
 
     const child = spawn(process.execPath, [scriptPath, inputPath, outputPath]);
 
@@ -253,7 +299,9 @@ export async function extractWithOCR(pdfBuffer: Buffer): Promise<string> {
       console.log(`[child-ocr] ${data.toString().trim()}`);
     });
     child.stderr.on('data', (data) => {
-      console.error(`[child-ocr-error] ${data.toString().trim()}`);
+      const line = data.toString().trim();
+      stderrLines.push(line);
+      console.error(`[child-ocr-error] ${line}`);
     });
 
     await new Promise<void>((resolve, reject) => {
@@ -261,31 +309,26 @@ export async function extractWithOCR(pdfBuffer: Buffer): Promise<string> {
         if (code === 0) {
           resolve();
         } else {
-          reject(new Error(`OCR child process exited with code ${code}`));
+          reject(new Error(
+            `OCR child process exited with code ${code}` +
+            (stderrLines.length ? `\n${stderrLines.join('\n')}` : '')
+          ));
         }
       });
-      child.on('error', (err) => {
-        reject(err);
-      });
+      child.on('error', (err) => reject(err));
     });
 
-    console.log(`[pdf-ai] OCR: Reading results from output path: ${outputPath}`);
+    console.log(`[pdf-ai] OCR: Reading output: ${outputPath}`);
     if (fs.existsSync(outputPath)) {
-      const resultText = fs.readFileSync(outputPath, 'utf8');
-      return resultText;
-    } else {
-      throw new Error('OCR output file not created');
+      return fs.readFileSync(outputPath, 'utf8');
     }
+    throw new Error('OCR output file was not created by child process');
   } catch (err: any) {
     console.error('[pdf-ai] OCR execution failed:', err);
     throw err;
   } finally {
-    try {
-      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
-      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
-    } catch (cleanupErr) {
-      console.error('[pdf-ai] OCR cleanup failed:', cleanupErr);
-    }
+    try { if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath); } catch (_) { /* ignore */ }
+    try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch (_) { /* ignore */ }
   }
 }
 

@@ -11,6 +11,9 @@ const nextConfig = {
     '/api/ai/**': [
       './node_modules/pdf-parse/lib/pdf.js/**/*',
     ],
+    '/api/pdf/ocr': [
+      './src/app/api/pdf/ocr/run-ocr.mjs',
+    ],
   },
 
   images: {

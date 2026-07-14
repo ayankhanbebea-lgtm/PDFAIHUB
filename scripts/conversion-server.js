@@ -274,6 +274,106 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // OCR endpoint — renders PDF pages via mupdf and extracts text via Tesseract.js
+  if (req.url === '/ocr' && req.method === 'POST') {
+    log(`Received POST /ocr request. Content-Type: ${req.headers['content-type']}`);
+
+    const boundaryMatch = req.headers['content-type'] && req.headers['content-type'].match(/boundary=(.+)$/);
+    if (!boundaryMatch) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Multipart/form-data with boundary required' }));
+      return;
+    }
+
+    const boundary = boundaryMatch[1];
+    let body = Buffer.alloc(0);
+
+    req.on('data', chunk => { body = Buffer.concat([body, chunk]); });
+
+    req.on('end', async () => {
+      try {
+        log(`OCR body received: ${body.length} bytes`);
+
+        // Parse multipart body to extract file buffer
+        const boundaryBuffer = Buffer.from('--' + boundary);
+        const parts = [];
+        let idx = body.indexOf(boundaryBuffer);
+        while (idx !== -1) {
+          const nextIdx = body.indexOf(boundaryBuffer, idx + boundaryBuffer.length);
+          if (nextIdx === -1) break;
+          parts.push(body.slice(idx + boundaryBuffer.length, nextIdx));
+          idx = nextIdx;
+        }
+
+        let fileData = null;
+        for (const part of parts) {
+          const headerEnd = part.indexOf('\r\n\r\n');
+          if (headerEnd === -1) continue;
+          const headers = part.slice(0, headerEnd).toString('utf-8');
+          if (headers.includes('name="file"') || headers.includes('name="File"')) {
+            fileData = part.slice(headerEnd + 4, part.length - 2);
+          }
+        }
+
+        if (!fileData || fileData.length === 0) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'No file uploaded' }));
+          return;
+        }
+
+        log(`OCR: processing file of ${fileData.length} bytes`);
+
+        // Determine file type by header signature
+        const isPdf = fileData[0] === 0x25 && fileData[1] === 0x50 && fileData[2] === 0x44 && fileData[3] === 0x46;
+        log(`OCR: file type = ${isPdf ? 'PDF' : 'IMAGE'}`);
+
+        // Load mupdf via dynamic ESM import (it uses top-level await internally)
+        log('OCR: initializing mupdf...');
+        const mupdf = (await import('mupdf')).default;
+
+        log('OCR: initializing Tesseract worker...');
+        const { createWorker } = await import('tesseract.js');
+        const worker = await createWorker('eng');
+
+        const textParts = [];
+
+        if (isPdf) {
+          const doc = mupdf.Document.openDocument(fileData, 'application/pdf');
+          const pageCount = doc.countPages();
+          log(`OCR: rendering ${pageCount} PDF page(s)...`);
+
+          for (let i = 0; i < pageCount; i++) {
+            const page = doc.loadPage(i);
+            const scaleMatrix = mupdf.Matrix.scale(2, 2);
+            const pixmap = page.toPixmap(scaleMatrix, mupdf.ColorSpace.DeviceRGB);
+            const jpegBytes = pixmap.asJPEG(90);
+            const imageBuffer = Buffer.from(jpegBytes);
+            const { data: { text } } = await worker.recognize(imageBuffer);
+            textParts.push(`--- PAGE ${i + 1} ---\n${text}`);
+            log(`OCR: page ${i + 1}/${pageCount} done`);
+          }
+        } else {
+          log('OCR: running Tesseract on image directly...');
+          const { data: { text } } = await worker.recognize(fileData);
+          textParts.push(text);
+        }
+
+        await worker.terminate();
+
+        const fullText = textParts.join('\n');
+        log(`OCR: complete — ${fullText.length} chars extracted`);
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ text: fullText }));
+      } catch (ocrErr) {
+        log(`OCR error: ${ocrErr.stack || ocrErr.message}`, 'ERROR');
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: ocrErr.message || 'OCR failed' }));
+      }
+    });
+    return;
+  }
+
   // Not found
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'Not Found' }));
