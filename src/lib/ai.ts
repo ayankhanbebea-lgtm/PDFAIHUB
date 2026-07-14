@@ -65,7 +65,7 @@ async function generateWithAI(
         { role: 'user',   content: prompt },
       ],
       temperature: 0.7,
-      max_tokens: 4096,
+      max_tokens: 8192,
     });
     const text = completion.choices[0]?.message?.content || '';
     console.log(`[ai] Groq OK — responseLen: ${text.length}`);
@@ -232,15 +232,7 @@ Text: ${segment.slice(0, 10000)}
     self.findIndex(c => c.front.trim().toLowerCase() === card.front.trim().toLowerCase()) === idx
   );
   
-  // Pad if we got fewer than count
-  while (uniqueCards.length < count) {
-    const padIndex = uniqueCards.length;
-    uniqueCards.push({
-      front: `Key Concept Review Topic #${padIndex + 1}`,
-      back: `Please review the main ideas discussed in the document [Page 1].`
-    });
-  }
-  
+  // Return whatever was generated — no fake padding
   return uniqueCards.slice(0, count);
 }
 
@@ -296,22 +288,7 @@ Text: ${segment.slice(0, 10000)}
     self.findIndex(item => item.question.trim().toLowerCase() === q.question.trim().toLowerCase()) === idx
   );
   
-  // Pad if we got fewer than count
-  while (uniqueQuestions.length < count) {
-    const padIndex = uniqueQuestions.length;
-    uniqueQuestions.push({
-      question: `Which of the following is a key concept covered in the text? [#${padIndex + 1}]`,
-      options: [
-        "A major theme outlined in the document",
-        "An unrelated secondary topic",
-        "General unrelated information",
-        "None of the above"
-      ],
-      correctIndex: 0,
-      explanation: "Please refer to the document context to review the main topics."
-    });
-  }
-  
+  // Return whatever was generated — no fake padding
   return uniqueQuestions.slice(0, count);
 }
 
@@ -522,7 +499,7 @@ export async function generateWithAIWithBackoff(
             { role: 'user',   content: prompt },
           ],
           temperature: 0.5,
-          max_tokens: 4096,
+          max_tokens: 8192,
         }, isVercel ? { timeout: 30000 } : undefined);
         const text = completion.choices[0]?.message?.content || '';
         return text;
@@ -590,94 +567,77 @@ export async function generateExamChunk(
   const systemPrompt = `You are a distinguished university professor and exam board setter. You write comprehensive study notes, create flashcards, MCQs, and mock exam questions.
 You must respond with valid JSON only. Raw JSON only, no backticks, no markdown code blocks.`;
 
-  // Bound chunk text to prevent Groq token limit overflow (approx 12k chars ~ 3k tokens safe)
-  const chunkTextBounded = chunk.text.slice(0, 12000);
-  const prompt = `Analyze this textbook/study material context from Page ${chunk.startPage} to Page ${chunk.endPage}:
+  // Groq llama-3.3-70b-versatile supports 128K context window.
+  // We bound at 32,000 chars (~8,000 tokens) to stay well within limits
+  // while still feeding the AI enough content for complete, rich output.
+  const chunkTextBounded = chunk.text.slice(0, 32000);
+
+  const pageRange = chunk.startPage === chunk.endPage
+    ? `Page ${chunk.startPage}`
+    : `Pages ${chunk.startPage}–${chunk.endPage}`;
+
+  const prompt = `You are analyzing textbook/study material covering ${pageRange}.
+
+CONTENT:
 ---
 ${chunkTextBounded}
 ---
 
-Generate:
-1. "chapterTitle": The actual chapter or section title extracted from the text (do not invent generic names like "Chapter X" or "Introduction" if there's an actual topic title in the text).
-2. "smartNotes": Chapter-wise study notes including bullet points (at least 3 sentences per concept), definitions, formulas, worked examples, and exam tips. Each bullet point and element must contain a reference indicating which page it came from, e.g. "[Page X]".
-3. "importantTopics": Up to 3 important topics from this text, stating why they are important.
-4. "pyqQuestions": Exactly 2 Previous Year style exam questions (1 Conceptual, 1 Analytical), with ideal answers and guidelines. Must reference the source page number, e.g. "[From Page X]".
-5. "mcqs": Exactly 5 Multiple-Choice Questions (MCQs): mix of Easy, Medium, Hard. Each must have difficulty, question text, 4 options, correctIndex (0-3), and explanation referencing the source page number, e.g. "[Page X]". No duplicate questions.
-6. "flashcards": Exactly 5 Flashcards. Each must have front (term/concept) and back (definition/concise answer referencing [Page X]).
-7. "mockQuestions": Exactly 3 Mock Test questions (1 for Section A, 1 for Section B, 1 for Section C) with ideal answers, referencing the source page, e.g. "[From Page X]".
+IMPORTANT RULES:
+- Use ONLY the content above. Do NOT invent facts or import outside knowledge.
+- Every bullet point, definition, question and answer MUST reference the exact page number it comes from, e.g. [Page X].
+- If the content covers multiple pages, spread your output proportionally across them.
+- Generate as much real content as the text supports. Do NOT use placeholder sentences like "Review pages...", "No definitions found", "No examples on this page", etc.
+- The chapter title must be extracted verbatim from the content (e.g. the heading or chapter name visible in the text). Do not use "Chapter X" or generic names unless the actual text says so.
 
-You must use ONLY the provided textbook context. Do not use outside knowledge. If the context has insufficient information, write realistic study content strictly limited to the topics in this text.
+Generate the following from the content above:
+1. chapterTitle: Exact chapter/section title from the content.
+2. smartNotes:
+   - bulletPoints: At minimum 5 substantive bullet points (3+ sentences each), each ending with [Page X].
+   - definitions: All technical terms, key concepts, or jargon defined in this text. Reference [Page X].
+   - formulas: All mathematical or scientific formulas from this text. Reference [Page X].
+   - examples: All worked examples, case studies, or illustrations from this text. Reference [Page X].
+   - examTips: At minimum 3 tips a professor would give a student preparing for exams on this content.
+3. importantTopics: Exactly 5 important topics, each with title, importance (High/Medium/Low), and whyImportant.
+4. pyqQuestions: Exactly 5 Previous Year Exam style questions — mix of Conceptual, Analytical, and Application. Include idealAnswer and guidelines for each. Reference [From Page X].
+5. mcqs: Exactly 10 Multiple-Choice Questions — 3 Easy, 4 Medium, 3 Hard. Each with difficulty, question, 4 options, correctIndex (0-3), and explanation. Reference [Page X].
+6. flashcards: Exactly 8 flashcards. front = term/concept/question. back = concise but complete answer. Reference [Page X].
+7. mockQuestions: Exactly 5 Mock Test questions:
+   - 2 Section A (short answer, 2-3 marks)
+   - 2 Section B (medium answer, 5-6 marks)
+   - 1 Section C (long essay, 10 marks)
+   Include idealAnswer for each. Reference [From Page X].
 
-Return this exact JSON structure:
+Respond ONLY with this exact JSON (no markdown, no explanation):
 {
-  "chapterTitle": "Actual Title",
+  "chapterTitle": "Exact title from text",
   "smartNotes": {
-    "bulletPoints": [
-      "Key concept explanation containing page reference [Page X]..."
-    ],
-    "definitions": [
-      { "term": "Term", "definition": "Academic definition referencing [Page X]" }
-    ],
-    "formulas": [
-      { "formula": "Formula", "description": "Formula explanation referencing [Page X]" }
-    ],
-    "examples": [
-      { "scenario": "Worked scenario", "solution": "Step-by-step solution referencing [Page X]" }
-    ],
-    "examTips": ["Tip referencing [Page X]"]
+    "bulletPoints": ["Detailed point with [Page X]"],
+    "definitions": [{"term": "Term", "definition": "Definition [Page X]"}],
+    "formulas": [{"formula": "Formula expression", "description": "What it means [Page X]"}],
+    "examples": [{"scenario": "Example scenario [Page X]", "solution": "Step-by-step solution"}],
+    "examTips": ["Exam tip based on content [Page X]"]
   },
   "importantTopics": [
-    { "title": "Topic", "importance": "High", "whyImportant": "Explanation" }
+    {"title": "Topic name", "importance": "High", "whyImportant": "Reason from text"}
   ],
   "pyqQuestions": [
-    {
-      "questionType": "Conceptual",
-      "question": "Question 1? [From Page X]",
-      "idealAnswer": "Ideal answer 1",
-      "guidelines": "Core points expected"
-    },
-    {
-      "questionType": "Analytical",
-      "question": "Question 2? [From Page X]",
-      "idealAnswer": "Ideal answer 2",
-      "guidelines": "Core points expected"
-    }
+    {"questionType": "Conceptual", "question": "Question? [From Page X]", "idealAnswer": "Full answer", "guidelines": "Marking points"}
   ],
   "mcqs": [
-    {
-      "difficulty": "Medium",
-      "question": "MCQ Question? [From Page X]",
-      "options": ["A", "B", "C", "D"],
-      "correctIndex": 0,
-      "explanation": "Reasoning. Source: [Page X]"
-    }
+    {"difficulty": "Medium", "question": "Question? [Page X]", "options": ["A", "B", "C", "D"], "correctIndex": 0, "explanation": "Reason [Page X]"}
   ],
   "flashcards": [
-    {
-      "front": "Question/Term",
-      "back": "Answer referencing [Page X]"
-    }
+    {"front": "Term or question", "back": "Definition or answer [Page X]"}
   ],
   "mockQuestions": [
-    {
-      "section": "Section A",
-      "question": "Mock question A? [From Page X]",
-      "idealAnswer": "Model answer A"
-    },
-    {
-      "section": "Section B",
-      "question": "Mock question B? [From Page X]",
-      "idealAnswer": "Model answer B"
-    },
-    {
-      "section": "Section C",
-      "question": "Mock question C? [From Page X]",
-      "idealAnswer": "Model answer C"
-    }
+    {"section": "Section A", "question": "Short question? [From Page X]", "idealAnswer": "Model answer"},
+    {"section": "Section B", "question": "Medium question? [From Page X]", "idealAnswer": "Model answer"},
+    {"section": "Section C", "question": "Essay question? [From Page X]", "idealAnswer": "Model answer"}
   ]
 }`;
 
-  console.log(`[generateExamChunk] Generating Chunk ${chunk.chunkIndex} (pages ${chunk.startPage}-${chunk.endPage}) using ${provider}...`);
+  console.log(`[generateExamChunk] Chunk ${chunk.chunkIndex} (pages ${chunk.startPage}-${chunk.endPage}): text=${chunk.text.length} chars, bounded=${chunkTextBounded.length} chars, sending to ${provider}`);
   let attempt = 0;
   while (attempt <= retryCount) {
     try {
@@ -701,12 +661,9 @@ Return this exact JSON structure:
         parsed.smartNotes = { bulletPoints: [], definitions: [], formulas: [], examples: [], examTips: [] };
       }
       if (!Array.isArray(parsed.smartNotes.bulletPoints)) {
-        parsed.smartNotes.bulletPoints = [`Study concept breakdown for pages ${chunk.startPage} to ${chunk.endPage}.`];
+        parsed.smartNotes.bulletPoints = [];
       } else {
         parsed.smartNotes.bulletPoints = parsed.smartNotes.bulletPoints.filter((b: any) => typeof b === 'string' && b.trim());
-        if (parsed.smartNotes.bulletPoints.length === 0) {
-          parsed.smartNotes.bulletPoints = [`Study concept breakdown for pages ${chunk.startPage} to ${chunk.endPage}.`];
-        }
       }
       if (!Array.isArray(parsed.smartNotes.definitions)) parsed.smartNotes.definitions = [];
       if (!Array.isArray(parsed.smartNotes.formulas)) parsed.smartNotes.formulas = [];
@@ -752,7 +709,13 @@ Return this exact JSON structure:
       if (!Array.isArray(parsed.pyqQuestions)) parsed.pyqQuestions = [];
       if (!Array.isArray(parsed.mockQuestions)) parsed.mockQuestions = [];
 
-      console.log(`[generateExamChunk] Chunk ${chunk.chunkIndex} completed in ${latency}. (Prompt size: ${prompt.length} chars, Response: ${cleanJson.length} chars)`);
+      console.log(`[generateExamChunk] Chunk ${chunk.chunkIndex} done in ${latency}: ` +
+        `${parsed.smartNotes?.bulletPoints?.length || 0} bullets, ` +
+        `${parsed.pyqQuestions?.length || 0} PYQs, ` +
+        `${parsed.mcqs?.length || 0} MCQs, ` +
+        `${parsed.flashcards?.length || 0} flashcards, ` +
+        `${parsed.mockQuestions?.length || 0} mock Qs. ` +
+        `(Prompt: ${prompt.length} chars, Response: ${cleanJson.length} chars)`);
       return parsed;
     } catch (err: any) {
       attempt++;

@@ -120,8 +120,14 @@ export async function POST(request: NextRequest) {
             send({ type: 'timing', stage: 'OCR (if used)', durationMs: 0 });
           }
 
-          const wordsTotal = pages.reduce((acc, p) => acc + (p.text || '').split(/\s+/).length, 0);
-          console.log(`[route] Extracted ${pages.length} pages, ${wordsTotal} words.`);
+          const wordsTotal = pages.reduce((acc, p) => acc + (p.text || '').split(/\s+/).filter((w: string) => w).length, 0);
+          const charTotal = pages.reduce((acc, p) => acc + (p.text || '').length, 0);
+          const tokenEst = Math.round(charTotal / 4);
+          console.log(`[route] Extracted ${pages.length} pages, ${wordsTotal} words, ${charTotal} chars, ~${tokenEst} tokens.`);
+
+          if (charTotal < 100 && pages.length > 0) {
+            console.warn(`[route] ⚠ Very low extraction: only ${charTotal} chars from ${pages.length} pages. PDF may be scanned/image-based.`);
+          }
 
           if (pages.length === 0) {
             send({ type: 'error', error: 'Could not extract text from PDF' });
@@ -133,19 +139,22 @@ export async function POST(request: NextRequest) {
             type: 'extraction_complete',
             pageCount: pages.length,
             wordCount: wordsTotal,
-            message: `✔ Content extracted: ${pages.length} pages, ${wordsTotal} words.`
+            message: `✔ Content extracted: ${pages.length} pages, ${wordsTotal} words, ${charTotal} chars.`
           });
 
           // Stage 3: Chunking
           const chunkingStart = performance.now();
-          // Dynamic chunk size to minimize total LLM requests
-          let initialPageSize = 10;
-          if (pages.length <= 25) {
-            initialPageSize = 10; // ~2 chunks
-          } else if (pages.length <= 100) {
-            initialPageSize = 15; // ~7 chunks
+          // Dynamic chunk size: smaller chunks → more AI calls → more content generated
+          // For small PDFs (≤20 pages): 5 pages/chunk → ≥4 AI calls for a 20-page PDF
+          // For medium (≤60 pages): 8 pages/chunk
+          // For large (>60 pages): 12 pages/chunk
+          let initialPageSize = 5;
+          if (pages.length <= 20) {
+            initialPageSize = 5;
+          } else if (pages.length <= 60) {
+            initialPageSize = 8;
           } else {
-            initialPageSize = 25; // ~10 chunks for 250 pages
+            initialPageSize = 12;
           }
 
           const initialChunks = groupPagesIntoChunks(pages, initialPageSize);
@@ -157,16 +166,20 @@ export async function POST(request: NextRequest) {
 
           // Calculate total text length across all pages
           const totalTextLength = pages.reduce((acc, p) => acc + p.text.length, 0);
-          console.log(`[DEBUG-EXAM-MODE] Total PDF pages processed: ${pages.length}`);
-          console.log(`[DEBUG-EXAM-MODE] Total extracted text length: ${totalTextLength} characters`);
-          console.log(`[DEBUG-EXAM-MODE] Total chunks created: ${chunksToProcess.length}`);
+          console.log(`[DEBUG-EXAM-MODE] Total PDF pages processed : ${pages.length}`);
+          console.log(`[DEBUG-EXAM-MODE] Total extracted text length: ${totalTextLength} chars`);
+          console.log(`[DEBUG-EXAM-MODE] Total chunks created        : ${chunksToProcess.length} (pageSize=${initialPageSize})`);
 
-          // Log chunk truncation check
+          // Log per-chunk stats (bound is 32000 chars now)
+          let totalCharsToAI = 0;
           chunksToProcess.forEach((chunk, index) => {
-            const isTruncated = chunk.text.length > 12000;
+            const bounded = Math.min(chunk.text.length, 32000);
+            totalCharsToAI += bounded;
+            const pct = chunk.text.length > 0 ? Math.round((bounded / chunk.text.length) * 100) : 100;
             console.log(`[DEBUG-EXAM-MODE] Chunk ${index + 1}/${chunksToProcess.length} (Pages ${chunk.startPage}-${chunk.endPage}): ` +
-              `Length: ${chunk.text.length} characters, will be truncated to 12000: ${isTruncated}`);
+              `${chunk.text.length} chars total → ${bounded} chars sent to AI (${pct}% coverage)`);
           });
+          console.log(`[DEBUG-EXAM-MODE] Total chars sent to AI: ${totalCharsToAI} / ${totalTextLength} (${totalTextLength > 0 ? Math.round((totalCharsToAI/totalTextLength)*100) : 100}% coverage)`);
 
           send({
             type: 'status',
@@ -191,21 +204,9 @@ export async function POST(request: NextRequest) {
               
               const pageSize = chunk.pages.length;
               if (pageSize <= 1) {
-                return [{
-                  chapterTitle: `Pages ${chunk.startPage}-${chunk.endPage} (Fallback Summary)`,
-                  smartNotes: {
-                    bulletPoints: [`Review content in original textbook on pages ${chunk.startPage}-${chunk.endPage}.`],
-                    definitions: [],
-                    formulas: [],
-                    examples: [],
-                    examTips: []
-                  },
-                  importantTopics: [],
-                  pyqQuestions: [],
-                  mcqs: [],
-                  flashcards: [],
-                  mockQuestions: []
-                }];
+                // Cannot split further — skip this chunk rather than emit fake placeholder content
+                console.warn(`[route] Single-page chunk ${chunk.chunkIndex} (page ${chunk.startPage}) failed. Skipping to avoid placeholder content.`);
+                return [];
               }
 
               const newPageSize = Math.max(1, Math.floor(pageSize / 2));
