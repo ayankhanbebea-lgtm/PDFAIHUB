@@ -12,10 +12,14 @@
 import { PDFDocument } from 'pdf-lib';
 import zlib from 'zlib';
 import { promisify } from 'util';
+import { spawn } from 'child_process';
+import path from 'path';
+import fs from 'fs';
+import os from 'os';
 
-// Hint for Vercel Next File Tracer to bundle the native/WASM dependencies of mupdf:
+// Hint for Vercel Next File Tracer to bundle the run-ocr.mjs script:
 if (false) {
-  import('mupdf');
+  require('../app/api/pdf/ocr/run-ocr.mjs');
 }
 
 const inflate = promisify(zlib.inflate);
@@ -232,61 +236,56 @@ export async function extractTextFromPDF(pdfBuffer: Buffer): Promise<string> {
 
 // ─── OCR using Tesseract.js (for scanned/image PDFs) ─────────────────────────
 export async function extractWithOCR(pdfBuffer: Buffer): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { createWorker } = require('tesseract.js');
-  console.log('[pdf-ai] OCR: initializing Tesseract worker...');
-
-  const worker = await createWorker('eng', 1, {
-    logger: (m: any) => {
-      if (m.status === 'recognizing text') {
-        process.stdout.write(`\r[pdf-ai] OCR: ${Math.round(m.progress * 100)}%`);
-      }
-    },
-  });
+  const tempDir = os.tmpdir();
+  const inputPath = path.join(tempDir, `ocr-input-${Date.now()}-${Math.random().toString(36).substring(2)}.pdf`);
+  const outputPath = path.join(tempDir, `ocr-output-${Date.now()}-${Math.random().toString(36).substring(2)}.txt`);
 
   try {
-    const images: Buffer[] = [];
-    const isPdf = pdfBuffer.slice(0, 4).toString() === '%PDF';
+    console.log(`[pdf-ai] OCR: Writing buffer to temp input path: ${inputPath}`);
+    fs.writeFileSync(inputPath, pdfBuffer);
 
-    if (isPdf) {
-      // Render PDF pages to JPEG buffers using MuPDF
-      const mupdf = eval('require')('mupdf');
-      const doc = mupdf.Document.openDocument(pdfBuffer, 'application/pdf');
-      const pageCount = doc.countPages();
-      console.log(`[pdf-ai] OCR: rendering ${pageCount} pages using MuPDF...`);
-      for (let i = 0; i < pageCount; i++) {
-        const page = doc.loadPage(i);
-        const scaleMatrix = mupdf.Matrix.scale(1.5, 1.5);
-        const pixmap = page.toPixmap(scaleMatrix, mupdf.ColorSpace.DeviceRGB);
-        const jpegBytes = pixmap.asJPEG(85);
-        images.push(Buffer.from(jpegBytes));
-      }
-      console.log(`[pdf-ai] OCR: successfully rendered ${images.length} pages.`);
+    const scriptPath = path.join(process.cwd(), 'src/app/api/pdf/ocr/run-ocr.mjs');
+    console.log(`[pdf-ai] OCR: Spawning node child process with script: ${scriptPath}`);
+
+    const child = spawn(process.execPath, [scriptPath, inputPath, outputPath]);
+
+    child.stdout.on('data', (data) => {
+      console.log(`[child-ocr] ${data.toString().trim()}`);
+    });
+    child.stderr.on('data', (data) => {
+      console.error(`[child-ocr-error] ${data.toString().trim()}`);
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`OCR child process exited with code ${code}`));
+        }
+      });
+      child.on('error', (err) => {
+        reject(err);
+      });
+    });
+
+    console.log(`[pdf-ai] OCR: Reading results from output path: ${outputPath}`);
+    if (fs.existsSync(outputPath)) {
+      const resultText = fs.readFileSync(outputPath, 'utf8');
+      return resultText;
     } else {
-      // Direct raw image file upload (PNG/JPEG)
-      images.push(pdfBuffer);
-      console.log(`[pdf-ai] OCR: processing raw image upload directly.`);
+      throw new Error('OCR output file not created');
     }
-
-    if (images.length === 0) {
-      console.log('[pdf-ai] OCR: no images to process');
-      await worker.terminate();
-      return '';
+  } catch (err: any) {
+    console.error('[pdf-ai] OCR execution failed:', err);
+    throw err;
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    } catch (cleanupErr) {
+      console.error('[pdf-ai] OCR cleanup failed:', cleanupErr);
     }
-
-    const textParts: string[] = [];
-    for (let i = 0; i < images.length; i++) {
-      console.log(`\n[pdf-ai] OCR: page ${i + 1}/${images.length}`);
-      const { data: { text } } = await worker.recognize(images[i]);
-      if (text.trim()) textParts.push(text.trim());
-    }
-
-    console.log('\n[pdf-ai] OCR: complete');
-    await worker.terminate();
-    return textParts.join('\n\n');
-  } catch (e: any) {
-    await worker.terminate();
-    throw e;
   }
 }
 
