@@ -17,9 +17,9 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 
-// Hint for Vercel Next File Tracer to bundle the run-ocr.mjs script:
+// Hint for Vercel Next File Tracer:
 if (false) {
-  require('../app/api/pdf/ocr/run-ocr.mjs');
+  import('mupdf');
 }
 
 const inflate = promisify(zlib.inflate);
@@ -369,73 +369,37 @@ export async function extractPagesFromPDF(pdfBuffer: Buffer): Promise<PDFPageDat
     const pdfParse = require('pdf-parse/lib/pdf-parse.js');
 
     await pdfParse(pdfBuffer, {
-      max: 0, // 0 = no page limit — process ALL pages
+      max: 0,
       pagerender: (pageData: any) => {
         return pageData.getTextContent().then((textContent: any) => {
           let text = '';
-          let lastY: number | null = null;
-
-          for (const item of (textContent.items || [])) {
-            // item.str is the text, item.transform[5] is the Y coordinate
-            const str = typeof item.str === 'string' ? item.str : '';
-            const y = Array.isArray(item.transform) ? item.transform[5] : null;
-
-            if (y !== null && lastY !== null && y !== lastY) {
-              // New line when Y position changes
+          let lastY = -1;
+          for (const item of textContent.items) {
+            if (lastY !== -1 && item.transform[5] !== lastY) {
               text += '\n';
             }
-            text += str;
-            if (y !== null) lastY = y;
+            text += item.str;
+            lastY = item.transform[5];
           }
-
           const pageNumber = pageData.pageIndex + 1;
-          const trimmed = text.trim();
-          pages.push({ pageNumber, text: trimmed });
+          pages.push({ pageNumber, text: text.trim() });
           return text;
         });
       }
     });
   } catch (err: any) {
     console.error('[pdf-ai] page-by-page pdf-parse failed:', err.message);
-    // Fallback: use extractTextFromPDF and split by double newlines as mock pages
     const fullText = await extractTextFromPDF(pdfBuffer);
-    const mockPages = fullText.split(/\n{3,}/);
+    const mockPages = fullText.split('\n\n');
     mockPages.forEach((pText, i) => {
-      if (pText.trim()) pages.push({ pageNumber: i + 1, text: pText.trim() });
+      pages.push({ pageNumber: i + 1, text: pText.trim() });
     });
   }
 
   pages.sort((a, b) => a.pageNumber - b.pageNumber);
-
-  // ── Full diagnostic logging ─────────────────────────────────────────────────
-  const totalChars = pages.reduce((acc, p) => acc + p.text.length, 0);
-  const totalWords = pages.reduce((acc, p) => acc + p.text.split(/\s+/).filter(w => w.length > 0).length, 0);
-  const totalTokensEst = Math.round(totalChars / 4); // rough 4 chars/token estimate
-
-  console.log(`[pdf-ai] ========== EXTRACTION COMPLETE ==========`);
-  console.log(`[pdf-ai] Total pages extracted : ${pages.length}`);
-  console.log(`[pdf-ai] Total characters      : ${totalChars}`);
-  console.log(`[pdf-ai] Total words           : ${totalWords}`);
-  console.log(`[pdf-ai] Estimated tokens      : ~${totalTokensEst}`);
-
-  let emptyPages = 0;
-  pages.forEach(p => {
-    const words = p.text.split(/\s+/).filter(w => w.length > 0).length;
-    if (words < 5) emptyPages++;
-    console.log(`[pdf-ai]   Page ${String(p.pageNumber).padStart(3)}: ${p.text.length} chars, ${words} words`);
-  });
-
-  if (emptyPages > 0) {
-    console.warn(`[pdf-ai] ⚠ ${emptyPages} pages have fewer than 5 words — PDF may be partially scanned or image-based.`);
-  }
-  if (totalChars < 100) {
-    console.warn(`[pdf-ai] ⚠ Very low total extraction (${totalChars} chars). PDF may be scanned. Consider OCR.`);
-  }
-  console.log(`[pdf-ai] ==========================================`);
-
+  console.log(`[pdf-ai] Successfully extracted ${pages.length} pages.`);
   return pages;
 }
-
 
 export interface DocumentChunk {
   id: string;
@@ -506,6 +470,10 @@ export function groupPagesIntoChunks(pages: PDFPageData[], pageSize: number = 10
   console.log(`[pdf-ai] Grouped ${pages.length} pages into ${chunks.length} page-chunks (pageSize=${pageSize}).`);
   return chunks;
 }
+
+
+
+
 
 
 

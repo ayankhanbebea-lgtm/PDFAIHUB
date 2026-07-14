@@ -482,6 +482,91 @@ export async function generateWithAIWithBackoff(
   requestedProvider: string = 'groq',
   preferredModel: string = 'llama-3.3-70b-versatile'
 ): Promise<string> {
+  if (process.env.MOCK_AI === 'true') {
+    console.log('[ai] MOCK_AI is active. Returning mock JSON response...');
+    if (prompt.includes('shortSummary')) {
+      return JSON.stringify({
+        shortSummary: "A mock short summary of the computer science concepts.",
+        detailedSummary: "This is a detailed mock summary that covers data structures, algorithms, and complex systems architecture.",
+        keyPoints: ["Data structures store data.", "Algorithms process data.", "Architecture defines system design."],
+        examRevisionNotes: "Revision notes: focus on runtime complexity and storage layouts.",
+        importantQuestions: ["What is Big O notation?", "Explain array vs linked list."]
+      });
+    }
+    if (prompt.includes('flashcards')) {
+      return JSON.stringify({
+        flashcards: [
+          { front: "Algorithm", back: "A step-by-step procedure for solving a problem [Page 1]" },
+          { front: "Data Structure", back: "A specialized format for organizing and storing data [Page 1]" },
+          { front: "Big O", back: "Mathematical notation that describes the limiting behavior of a function [Page 1]" }
+        ]
+      });
+    }
+    if (prompt.includes('questions')) {
+      return JSON.stringify({
+        questions: [
+          { question: "What is the time complexity of binary search?", options: ["O(1)", "O(log n)", "O(n)", "O(n^2)"], correctIndex: 1, explanation: "Binary search repeatedly halves the search space. Source: [Page 1]" },
+          { question: "Which data structure follows LIFO?", options: ["Queue", "Stack", "Tree", "Graph"], correctIndex: 1, explanation: "Stack elements are inserted and removed from the same end. Source: [Page 1]" }
+        ]
+      });
+    }
+    if (prompt.includes('chapterTitle') || prompt.includes('smartNotes')) {
+      return JSON.stringify({
+        chapterTitle: "Introduction to Computational Complexity",
+        smartNotes: {
+          bulletPoints: [
+            "Computational complexity classifies problems according to their inherent difficulty [Page 1].",
+            "Time complexity analyzes the number of operations required by an algorithm [Page 1]."
+          ],
+          definitions: [
+            { term: "Complexity Class", definition: "A set of problems of related complexity referencing [Page 1]" }
+          ],
+          formulas: [
+            { formula: "T(n) = O(f(n))", description: "Asymptotic upper bound definition referencing [Page 1]" }
+          ],
+          examples: [
+            { scenario: "Linear search", solution: "Checks every element one by one, resulting in O(n) runtime referencing [Page 1]" }
+          ],
+          examTips: ["Understand the difference between P and NP complexity classes referencing [Page 1]"]
+        },
+        importantTopics: [
+          { title: "Big-O Notation", importance: "High", whyImportant: "Fundamental way to express algorithm bounds." }
+        ],
+        pyqQuestions: [
+          {
+            questionType: "Conceptual",
+            question: "Define P vs NP [From Page 1]",
+            idealAnswer: "P is solvable in polynomial time; NP is verifiable in polynomial time.",
+            guidelines: "Check for correct definition of solvable vs verifiable."
+          }
+        ],
+        mcqs: [
+          {
+            difficulty: "Medium",
+            question: "Which class contains problems solvable in polynomial time? [From Page 1]",
+            options: ["P", "NP", "NP-Complete", "NP-Hard"],
+            correctIndex: 0,
+            explanation: "P stands for polynomial time. Source: [Page 1]"
+          }
+        ],
+        flashcards: [
+          {
+            front: "P Class",
+            back: "Solvable in polynomial time referencing [Page 1]"
+          }
+        ],
+        mockQuestions: [
+          {
+            section: "Section A",
+            question: "What is NP-completeness? [From Page 1]",
+            idealAnswer: "Problems in NP to which all other NP problems can be reduced."
+          }
+        ]
+      });
+    }
+    return '{}';
+  }
+
   const provider = resolveProvider(requestedProvider);
   let currentModel = preferredModel;
   let delay = 2000;
