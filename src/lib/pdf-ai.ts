@@ -214,8 +214,8 @@ export async function extractTextFromPDF(pdfBuffer: Buffer): Promise<string> {
 
   // ── Strategy 3: Tesseract.js OCR for scanned PDFs ─────────────────────────
   const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
-  if (isVercel) {
-    console.log('[pdf-ai] Strategy 3 (OCR) skipped in production/Vercel to prevent 10s gateway timeout.');
+  if (isVercel && !process.env.CONVERSION_BACKEND_URL) {
+    console.log('[pdf-ai] Strategy 3 (OCR) skipped in production/Vercel (no CONVERSION_BACKEND_URL) to prevent 10s gateway timeout.');
     return strategy1Text;
   }
 
