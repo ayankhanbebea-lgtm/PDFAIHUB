@@ -28,23 +28,20 @@ export async function POST(request: NextRequest) {
     const isTest = rawKeyId.startsWith('rzp_test');
     const mode = isLive ? 'Live' : isTest ? 'Test' : 'Unknown';
 
-    // 4. Log environment & credentials
-    console.log('[razorpay-create] Audit Details:', {
-      loadedKeyIdMasked: maskedKeyId,
-      isLiveKeyLoaded: isLive,
-      isTestKeyLoaded: isTest,
-      mode,
-      environment: process.env.NODE_ENV,
-    });
+    console.log('>>> [PRODUCTION AUDIT] RAZORPAY KEY ID IN USE:', maskedKeyId);
+    console.log('>>> [PRODUCTION AUDIT] DETECTED MODE:', mode);
+    console.log('>>> [PRODUCTION AUDIT] NODE ENVIRONMENT:', process.env.NODE_ENV);
 
     if (isLive) {
-      console.warn('[razorpay-create] WARNING: Live Razorpay key detected in non-production/debug run!');
+      console.warn('>>> [PRODUCTION AUDIT] WARNING: LIVE mode enabled for this order creation.');
+    } else {
+      console.warn('>>> [PRODUCTION AUDIT] WARNING: TEST mode enabled. Live keys are NOT in use!');
     }
 
     const result = await createRazorpayOrder(session.user.id, planType);
 
-    // 4. Log Razorpay response & order details
-    console.log('[razorpay-create] Razorpay Response:', result);
+    console.log('>>> [PRODUCTION AUDIT] RAZORPAY ORDER RESPONSE:', JSON.stringify(result, null, 2));
+    console.log('>>> [PRODUCTION AUDIT] ORDER ID GENERATED:', result.orderId);
 
     return NextResponse.json({
       ...result,
